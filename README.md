@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Authentik](https://img.shields.io/badge/Authentik-2024.10%2B-orange.svg)](https://goauthentik.io/)
+[![Authentik](https://img.shields.io/badge/Authentik-2026.5%2B-orange.svg)](https://goauthentik.io/)
 
 Automated blueprint generator for Authentik Identity Provider (IDP) and Main OIDC instances.
 
