@@ -95,3 +95,30 @@ python generate.py
 
 # 5. Find your blueprints in the output/ directory
 ls output/
+
+
+## Manual start
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env files from examples
+cp .env.idp.example .env.idp
+cp .env.main-oidc.example .env.main-oidc
+
+# Create output directories
+mkdir -p output logs
+
+# Edit .env files with your configuration
+nano .env.idp
+nano .env.main-oidc
+
+python3 main_oidc_blueprint.py --env .env_main
+
+python3 idp_generate_blueprint.py --env .env_idp
+
+
