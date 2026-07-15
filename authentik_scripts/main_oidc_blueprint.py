@@ -2,12 +2,11 @@
 """
 Authentik Main Instance Blueprint Generator
 Generates a complete blueprint YAML file for the main authentik instance with:
-- Recovery Flow
+- Enrollment Invitation Flow with email/username validation
 - Federated JIT Enrollment Flow
 - OAuth Source Property Mapping
 - Scope Mappings
 - All necessary flows, stages, and bindings
-- Recovery flow attached to authentication flow
 """
 
 import os
@@ -131,23 +130,6 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Flow: recovery-flow (Recovery Flow)
-    entries.append({
-        "model": "authentik_flows.flow",
-        "identifiers": {"slug": "recovery-flow"},
-        "attrs": {
-            "name": "recovery-flow",
-            "title": "Recovery Flow",
-            "designation": "recovery",
-            "authentication": "none",
-            "policy_engine_mode": "any",
-            "compatibility_mode": False,
-            "denied_action": "message_continue",
-            "layout": "stacked"
-        },
-        "state": "present"
-    })
-    
     # Flow: federated-jit-enrollment (Federated JIT Enrollment Flow)
     entries.append({
         "model": "authentik_flows.flow",
@@ -159,6 +141,23 @@ def generate_blueprint(
             "authentication": "none",
             "policy_engine_mode": "any",
             "compatibility_mode": False,
+            "denied_action": "message_continue",
+            "layout": "stacked"
+        },
+        "state": "present"
+    })
+    
+    # Flow: enrollment-invitation (Enrollment Invitation Flow with validation)
+    entries.append({
+        "model": "authentik_flows.flow",
+        "identifiers": {"slug": "enrollment-invitation"},
+        "attrs": {
+            "name": "enrollment-invitation",
+            "title": "Enrollment Invitation",
+            "designation": "enrollment",
+            "authentication": "none",
+            "policy_engine_mode": "any",
+            "compatibility_mode": True,
             "denied_action": "message_continue",
             "layout": "stacked"
         },
@@ -181,27 +180,6 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Stage: recovery-email (Email Stage for Recovery)
-    entries.append({
-        "model": "authentik_stages_email.emailstage",
-        "identifiers": {"name": "recovery-email"},
-        "attrs": {
-            "name": "recovery-email",
-            "activate_user_on_success": False,
-            "host": os.getenv("EMAIL_HOST", ""),
-            "port": int(os.getenv("EMAIL_PORT", "587")),
-            "username": os.getenv("EMAIL_USERNAME", ""),
-            "password": os.getenv("EMAIL_PASSWORD", ""),
-            "use_tls": True,
-            "use_ssl": False,
-            "timeout": 30,
-            "from_address": os.getenv("EMAIL_FROM", "noreply@authentik.local"),
-            "subject": "Recovery Email",
-            "template": "email/recovery.html"
-        },
-        "state": "present"
-    })
-    
     # Stage: create-jit-user (User Write Stage for JIT Enrollment)
     entries.append({
         "model": "authentik_stages_user_write.userwritestage",
@@ -216,8 +194,72 @@ def generate_blueprint(
         "state": "present"
     })
     
+    # Stage: enrollment-invitation-write (User Write Stage for Enrollment Invitation)
+    entries.append({
+        "model": "authentik_stages_user_write.userwritestage",
+        "identifiers": {"name": "enrollment-invitation-write"},
+        "attrs": {
+            "create_users_as_inactive": False,
+            "create_users_group": None,
+            "user_creation_mode": "create_when_required",
+            "user_path_template": "",
+            "user_type": "internal"
+        },
+        "state": "present"
+    })
+    
+    # Stage: enrollment-invitation (Invitation Stage)
+    entries.append({
+        "model": "authentik_stages_invitation.invitationstage",
+        "identifiers": {"name": "enrollment-invitation"},
+        "attrs": {
+            "continue_flow_without_invitation": False
+        },
+        "state": "present"
+    })
+    
+    # Stage: user-email-check-deny (Deny Stage for Email Check)
+    entries.append({
+        "model": "authentik_stages_deny.denystage",
+        "identifiers": {"name": "user-email-check-deny"},
+        "attrs": {
+            "deny_message": "Email already exists! Contact admin."
+        },
+        "state": "present"
+    })
+    
+    # Stage: user-username-check-deny (Deny Stage for Username Check)
+    entries.append({
+        "model": "authentik_stages_deny.denystage",
+        "identifiers": {"name": "user-username-check-deny"},
+        "attrs": {
+            "deny_message": "Username already exists! Try another one."
+        },
+        "state": "present"
+    })
+    
     # ================================================================
-    # 3. CUSTOM PROMPTS
+    # 3. PROMPT STAGES
+    # ================================================================
+    
+    # Prompt Stage: default-source-enrollment-prompt (for enrollment-invitation flow)
+    entries.append({
+        "model": "authentik_stages_prompt.promptstage",
+        "identifiers": {"name": "default-source-enrollment-prompt"},
+        "attrs": {
+            "fields": [
+                "!FIND_MARKER:[authentik_stages_prompt.prompt, [name, default-source-enrollment-field-username]]",
+                "!FIND_MARKER:[authentik_stages_prompt.prompt, [name, default-user-settings-field-name]]",
+                "!FIND_MARKER:[authentik_stages_prompt.prompt, [name, initial-setup-field-password]]",
+                "!FIND_MARKER:[authentik_stages_prompt.prompt, [name, initial-setup-field-password-repeat]]"
+            ],
+            "validation_policies": []
+        },
+        "state": "present"
+    })
+    
+    # ================================================================
+    # 4. CUSTOM PROMPTS
     # ================================================================
     
     # Prompt: orgId (dropdown)
@@ -239,48 +281,7 @@ def generate_blueprint(
     })
     
     # ================================================================
-    # 4. IDENTIFICATION STAGES
-    # ================================================================
-    
-    # Stage: recovery-authentication-identification (Identification for Recovery)
-    # This stage should be simple - just identify user by email
-    entries.append({
-        "model": "authentik_stages_identification.identificationstage",
-        "identifiers": {"name": "recovery-authentication-identification"},
-        "attrs": {
-            "name": "recovery-authentication-identification",
-            "user_fields": ["email"],
-            "pretend_user_exists": True,
-            "sources": [],
-            "show_source_labels": False,
-            "enable_remember_me": False,
-            "case_insensitive_matching": True
-        },
-        "state": "present"
-    })
-    
-    # ================================================================
-    # 5. PROMPT STAGES
-    # ================================================================
-    
-    # Prompt Stage: default-password-change-prompt
-    entries.append({
-        "model": "authentik_stages_prompt.promptstage",
-        "identifiers": {"name": "default-password-change-prompt"},
-        "attrs": {
-            "fields": [
-                "!FIND_MARKER:[authentik_stages_prompt.prompt, [name, default-password-change-field-password]]",
-                "!FIND_MARKER:[authentik_stages_prompt.prompt, [name, default-password-change-field-password-repeat]]"
-            ],
-            "validation_policies": [
-                "!FIND_MARKER:[authentik_policies_password.passwordpolicy, [name, default-password-change-password-policy]]"
-            ]
-        },
-        "state": "present"
-    })
-    
-    # ================================================================
-    # 6. CUSTOM PROPERTY MAPPINGS
+    # 5. CUSTOM PROPERTY MAPPINGS
     # ================================================================
     
     # OAuth Source Property Mapping: federated-oidc-mapping
@@ -343,7 +344,7 @@ def generate_blueprint(
     })
     
     # ================================================================
-    # 7. CUSTOM POLICIES
+    # 6. CUSTOM POLICIES
     # ================================================================
     
     # Policy: save-user-attributes
@@ -357,80 +358,30 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # ================================================================
-    # 8. FLOW STAGE BINDINGS FOR recovery-flow
-    # ================================================================
-    
-    # Binding 1: recovery-authentication-identification (order: 10)
+    # Policy: check-email-exist-policy
     entries.append({
-        "model": "authentik_flows.flowstagebinding",
-        "identifiers": {
-            "order": 10,
-            "stage": "!FIND_MARKER:[authentik_stages_identification.identificationstage, [name, recovery-authentication-identification]]",
-            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, recovery-flow]]"
-        },
+        "model": "authentik_policies_expression.expressionpolicy",
+        "identifiers": {"name": "check-email-exist-policy"},
         "attrs": {
-            "evaluate_on_plan": False,
-            "invalid_response_action": "retry",
-            "policy_engine_mode": "any",
-            "re_evaluate_policies": True
+            "execution_logging": True,
+            "expression": 'from authentik.core.models import User\n\nemail = request.context.get("prompt_data", {}).get("email")\n\nif not email:\n    return False\n\nexists = User.objects.filter(email__iexact=email).exists()\n\nreturn exists'
         },
         "state": "present"
     })
     
-    # Binding 2: recovery-email (order: 20)
+    # Policy: check-username-exist-policy
     entries.append({
-        "model": "authentik_flows.flowstagebinding",
-        "identifiers": {
-            "order": 20,
-            "stage": "!FIND_MARKER:[authentik_stages_email.emailstage, [name, recovery-email]]",
-            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, recovery-flow]]"
-        },
+        "model": "authentik_policies_expression.expressionpolicy",
+        "identifiers": {"name": "check-username-exist-policy"},
         "attrs": {
-            "evaluate_on_plan": False,
-            "invalid_response_action": "retry",
-            "policy_engine_mode": "any",
-            "re_evaluate_policies": True
-        },
-        "state": "present"
-    })
-    
-    # Binding 3: default-password-change-prompt (order: 30)
-    entries.append({
-        "model": "authentik_flows.flowstagebinding",
-        "identifiers": {
-            "order": 30,
-            "stage": "!FIND_MARKER:[authentik_stages_prompt.promptstage, [name, default-password-change-prompt]]",
-            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, recovery-flow]]"
-        },
-        "attrs": {
-            "evaluate_on_plan": False,
-            "invalid_response_action": "retry",
-            "policy_engine_mode": "any",
-            "re_evaluate_policies": True
-        },
-        "state": "present"
-    })
-    
-    # Binding 4: default-password-change-write (order: 40)
-    entries.append({
-        "model": "authentik_flows.flowstagebinding",
-        "identifiers": {
-            "order": 40,
-            "stage": "!FIND_MARKER:[authentik_stages_user_write.userwritestage, [name, default-password-change-write]]",
-            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, recovery-flow]]"
-        },
-        "attrs": {
-            "evaluate_on_plan": False,
-            "invalid_response_action": "retry",
-            "policy_engine_mode": "any",
-            "re_evaluate_policies": True
+            "execution_logging": True,
+            "expression": 'from authentik.core.models import User\n\nusername = request.context.get("prompt_data", {}).get("username")\n\nif not username:\n    return False\n\nexists = User.objects.filter(username__iexact=username).exists()\n\nreturn exists'
         },
         "state": "present"
     })
     
     # ================================================================
-    # 9. FLOW STAGE BINDINGS FOR federated-jit-enrollment
+    # 7. FLOW STAGE BINDINGS FOR federated-jit-enrollment
     # ================================================================
     
     # Binding 1: create-jit-user (order: 10)
@@ -450,6 +401,7 @@ def generate_blueprint(
         "state": "present"
     })
     
+    # Binding 2: default-authentication-login (order: 20)
     entries.append({
         "model": "authentik_flows.flowstagebinding",
         "identifiers": {
@@ -467,9 +419,180 @@ def generate_blueprint(
     })
     
     # ================================================================
+    # 8. FLOW STAGE BINDINGS FOR enrollment-invitation
+    # ================================================================
+    
+    # Binding 1: Invitation stage (order: 10)
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "identifiers": {
+            "order": 10,
+            "stage": "!FIND_MARKER:[authentik_stages_invitation.invitationstage, [name, enrollment-invitation]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 2: user-email-check-deny (order: 15) - with policy binding
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "id": "email-check-binding",
+        "identifiers": {
+            "order": 15,
+            "stage": "!FIND_MARKER:[authentik_stages_deny.denystage, [name, user-email-check-deny]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 3: Prompt stage (order: 20)
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "identifiers": {
+            "order": 20,
+            "stage": "!FIND_MARKER:[authentik_stages_prompt.promptstage, [name, default-source-enrollment-prompt]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 4: user-username-check-deny (order: 25) - with policy binding
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "id": "username-check-binding",
+        "identifiers": {
+            "order": 25,
+            "stage": "!FIND_MARKER:[authentik_stages_deny.denystage, [name, user-username-check-deny]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 5: User write stage (order: 30)
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "identifiers": {
+            "order": 30,
+            "stage": "!FIND_MARKER:[authentik_stages_user_write.userwritestage, [name, enrollment-invitation-write]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 6: Redirect stage (order: 40)
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "id": "redirect-binding",
+        "identifiers": {
+            "order": 40,
+            "stage": "!FIND_MARKER:[authentik_stages_redirect.redirectstage, [name, redirect-logout-stage]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # ================================================================
+    # 9. POLICY BINDINGS FOR enrollment-invitation
+    # ================================================================
+    
+    # Policy Binding: save-user-attributes to redirect stage (order: 0)
+    entries.append({
+        "model": "authentik_policies.policybinding",
+        "identifiers": {
+            "order": 0,
+            "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, save-user-attributes]]",
+            "target": "!KEYOF_MARKER:redirect-binding"
+        },
+        "attrs": {
+            "enabled": True,
+            "failure_result": False,
+            "group": None,
+            "negate": False,
+            "timeout": 30,
+            "user": None
+        },
+        "state": "present"
+    })
+    
+    # Policy Binding: check-email-exist-policy to email check deny stage (order: 0)
+    entries.append({
+        "model": "authentik_policies.policybinding",
+        "identifiers": {
+            "order": 0,
+            "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, check-email-exist-policy]]",
+            "target": "!KEYOF_MARKER:email-check-binding"
+        },
+        "attrs": {
+            "enabled": True,
+            "failure_result": False,
+            "group": None,
+            "negate": False,
+            "timeout": 30,
+            "user": None
+        },
+        "state": "present"
+    })
+    
+    # Policy Binding: check-username-exist-policy to username check deny stage (order: 0)
+    entries.append({
+        "model": "authentik_policies.policybinding",
+        "identifiers": {
+            "order": 0,
+            "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, check-username-exist-policy]]",
+            "target": "!KEYOF_MARKER:username-check-binding"
+        },
+        "attrs": {
+            "enabled": True,
+            "failure_result": False,
+            "group": None,
+            "negate": False,
+            "timeout": 30,
+            "user": None
+        },
+        "state": "present"
+    })
+    
+    # ================================================================
     # 10. FLOW STAGE BINDINGS FOR app-invalidation-flow
     # ================================================================
     
+    # Binding 1: default-invalidation-logout (order: 10)
     entries.append({
         "model": "authentik_flows.flowstagebinding",
         "identifiers": {
@@ -486,6 +609,7 @@ def generate_blueprint(
         "state": "present"
     })
     
+    # Binding 2: redirect-logout-stage (order: 20)
     entries.append({
         "model": "authentik_flows.flowstagebinding",
         "identifiers": {
@@ -571,21 +695,6 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # ================================================================
-    # 13. UPDATE DEFAULT AUTHENTICATION FLOW WITH RECOVERY
-    # ================================================================
-    
-    # Update the default authentication flow's identification stage
-    # to include the recovery flow
-    entries.append({
-        "model": "authentik_stages_identification.identificationstage",
-        "identifiers": {"name": "default-authentication-identification"},
-        "attrs": {
-            "recovery_flow": "!FIND_MARKER:[authentik_flows.flow, [slug, recovery-flow]]"
-        },
-        "state": "present"
-    })
-    
     blueprint["_metadata"] = {
         "client_id": client_id,
         "client_secret": client_secret
@@ -651,12 +760,10 @@ def save_blueprint_yaml(blueprint: Dict[str, Any], output_file: str = "main-auth
 def main():
     """Main function to generate blueprint from environment variables"""
     
-    # Read configuration from environment
     app_name = os.getenv("AUTHENTIK_APP_NAME", "main-oidc-app")
     app_slug = os.getenv("AUTHENTIK_APP_SLUG", "main-oidc-app")
     provider_name = os.getenv("AUTHENTIK_PROVIDER_NAME", "main-oidc-provider")
     
-    # Read redirect URIs from .env file
     redirect_uris_env = os.getenv("AUTHENTIK_REDIRECT_URIS", "")
     if redirect_uris_env:
         redirect_uris = [uri.strip() for uri in redirect_uris_env.split(",")]
@@ -677,7 +784,6 @@ def main():
     print(f"🔗 Logout URI: {logout_uri}")
     print("")
     
-    # Generate the blueprint
     blueprint = generate_blueprint(
         app_name=app_name,
         app_slug=app_slug,
@@ -686,13 +792,10 @@ def main():
         logout_uri=logout_uri
     )
     
-    # Save the blueprint
     save_blueprint_yaml(blueprint, output_file)
     
-    # Print summary
     print("\n📊 Blueprint Summary:")
     
-    # Find the provider entry
     provider_entry = find_provider_entry(blueprint)
     if provider_entry:
         attrs = provider_entry.get("attrs", {})
@@ -705,12 +808,13 @@ def main():
         print("  ⚠️  No provider found in blueprint")
     
     print("\n📋 Components included:")
-    print("  ✅ Recovery Flow (recovery-flow)")
-    print("    - recovery-authentication-identification (Identification Stage - simple email lookup)")
-    print("    - recovery-email (Email Stage)")
-    print("    - default-password-change-prompt (Prompt Stage)")
-    print("    - default-password-change-write (User Write Stage)")
-    print("  ✅ Recovery Flow attached to default-authentication-identification")
+    print("  ✅ Enrollment Invitation Flow (enrollment-invitation)")
+    print("    - enrollment-invitation (Invitation Stage)")
+    print("    - user-email-check-deny (Deny Stage with email check policy)")
+    print("    - default-source-enrollment-prompt (Prompt Stage)")
+    print("    - user-username-check-deny (Deny Stage with username check policy)")
+    print("    - enrollment-invitation-write (User Write Stage)")
+    print("    - redirect-logout-stage (Redirect Stage)")
     print("  ✅ Federated JIT Enrollment Flow (federated-jit-enrollment)")
     print("    - create-jit-user (User Write Stage)")
     print("    - default-authentication-login (User Login Stage)")
@@ -723,6 +827,8 @@ def main():
     print("  ✅ app-auth-flow")
     print("  ✅ app-invalidation-flow with default-invalidation-logout + redirect-logout-stage")
     print("  ✅ save-user-attributes Policy")
+    print("  ✅ check-email-exist-policy")
+    print("  ✅ check-username-exist-policy")
     print("  ✅ redirect-logout-stage")
     print("  ✅ orgId Prompt")
     print("  ✅ OAuth2 Provider with logout_uri")
