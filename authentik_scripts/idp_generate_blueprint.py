@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Authentik Blueprint Generator
+Authentik IDP Blueprint Generator
 Generates a complete blueprint YAML file for IDP authentik with custom configurations
 Includes: enrollment invitation flow, custom policies, mappings, stages, provider, and application
+Saves generated client credentials to .env file
 """
 
 import os
 import secrets
 import string
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -45,6 +47,47 @@ def generate_redirect_uris(redirect_uris_list: List[str]) -> List[Dict[str, Any]
         for url in redirect_uris_list
     ]
 
+def save_credentials_to_env(client_id: str, client_secret: str, env_file: str = ".env"):
+    """Save generated client credentials to .env file"""
+    try:
+        # Read existing .env file
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                content = f.read()
+        else:
+            content = ""
+        
+        # Check if credentials already exist in .env
+        if "AUTHENTIK_CLIENT_ID=" in content:
+            # Replace existing client ID
+            content = re.sub(r'AUTHENTIK_CLIENT_ID=.*\n?', f'AUTHENTIK_CLIENT_ID={client_id}\n', content)
+        else:
+            # Add new client ID (ensure newline before adding)
+            if content and not content.endswith('\n'):
+                content += '\n'
+            content += f'AUTHENTIK_CLIENT_ID={client_id}\n'
+        
+        if "AUTHENTIK_CLIENT_SECRET=" in content:
+            # Replace existing client secret
+            content = re.sub(r'AUTHENTIK_CLIENT_SECRET=.*\n?', f'AUTHENTIK_CLIENT_SECRET={client_secret}\n', content)
+        else:
+            # Add new client secret (ensure newline before adding)
+            if content and not content.endswith('\n'):
+                content += '\n'
+            content += f'AUTHENTIK_CLIENT_SECRET={client_secret}\n'
+        
+        # Write back to .env file
+        with open(env_file, 'w') as f:
+            f.write(content)
+        
+        print(f"✅ Credentials saved to {env_file}")
+        print(f"   Client ID: {client_id}")
+        print(f"   Client Secret: {client_secret}")
+        return True
+    except Exception as e:
+        print(f"⚠️  Could not save credentials to .env: {e}")
+        return False
+
 def generate_blueprint(
     app_name: str = "vm1-federated-app",
     app_slug: str = "vm1-federated-app",
@@ -73,6 +116,9 @@ def generate_blueprint(
     # Generate random credentials
     client_id = generate_random_client_id()
     client_secret = generate_random_client_secret()
+    
+    # Save credentials to .env file
+    save_credentials_to_env(client_id, client_secret)
     
     # Define the blueprint structure
     blueprint = {
@@ -183,6 +229,26 @@ def generate_blueprint(
         "state": "present"
     })
     
+    # Stage: user-email-check-deny (Deny Stage for Email Check)
+    entries.append({
+        "model": "authentik_stages_deny.denystage",
+        "identifiers": {"name": "user-email-check-deny"},
+        "attrs": {
+            "deny_message": "Email already exists! Contact admin."
+        },
+        "state": "present"
+    })
+    
+    # Stage: user-username-check-deny (Deny Stage for Username Check)
+    entries.append({
+        "model": "authentik_stages_deny.denystage",
+        "identifiers": {"name": "user-username-check-deny"},
+        "attrs": {
+            "deny_message": "Username already exists! Try another one."
+        },
+        "state": "present"
+    })
+    
     # ================================================================
     # 3. CUSTOM PROMPTS
     # ================================================================
@@ -265,15 +331,38 @@ def generate_blueprint(
     })
     
     # ================================================================
-    # 6. CUSTOM POLICY (save-user-attributes)
+    # 6. CUSTOM POLICIES
     # ================================================================
     
+    # Policy: save-user-attributes
     entries.append({
         "model": "authentik_policies_expression.expressionpolicy",
         "identifiers": {"name": "save-user-attributes"},
         "attrs": {
             "execution_logging": True,
             "expression": 'org = context.get("prompt_data", {}).get("orgId")\nwallet_id = context.get("prompt_data", {}).get("walletId")\nsigner_server = context.get("prompt_data", {}).get("signerServer")\n\nuser = context.get("pending_user")\n\nif user:\n    if org:\n        user.attributes["orgId"] = org\n    \n    if wallet_id:\n        user.attributes["walletId"] = wallet_id\n    \n    if signer_server:\n        user.attributes["signerServer"] = signer_server\n    \n    user.save()\n\nreturn True'
+        },
+        "state": "present"
+    })
+    
+    # Policy: check-email-exist-policy
+    entries.append({
+        "model": "authentik_policies_expression.expressionpolicy",
+        "identifiers": {"name": "check-email-exist-policy"},
+        "attrs": {
+            "execution_logging": True,
+            "expression": 'from authentik.core.models import User\n\nemail = request.context.get("prompt_data", {}).get("email")\n\nif not email:\n    return False\n\nexists = User.objects.filter(email__iexact=email).exists()\n\nreturn exists'
+        },
+        "state": "present"
+    })
+    
+    # Policy: check-username-exist-policy
+    entries.append({
+        "model": "authentik_policies_expression.expressionpolicy",
+        "identifiers": {"name": "check-username-exist-policy"},
+        "attrs": {
+            "execution_logging": True,
+            "expression": 'from authentik.core.models import User\n\nusername = request.context.get("prompt_data", {}).get("username")\n\nif not username:\n    return False\n\nexists = User.objects.filter(username__iexact=username).exists()\n\nreturn exists'
         },
         "state": "present"
     })
@@ -299,7 +388,25 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Binding 2: Prompt stage (order: 20)
+    # Binding 2: user-email-check-deny (order: 15) - with policy binding
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "id": "email-check-binding",
+        "identifiers": {
+            "order": 15,
+            "stage": "!FIND_MARKER:[authentik_stages_deny.denystage, [name, user-email-check-deny]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 3: Prompt stage (order: 20)
     entries.append({
         "model": "authentik_flows.flowstagebinding",
         "identifiers": {
@@ -316,7 +423,25 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Binding 3: User write stage (order: 30)
+    # Binding 4: user-username-check-deny (order: 25) - with policy binding
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "id": "username-check-binding",
+        "identifiers": {
+            "order": 25,
+            "stage": "!FIND_MARKER:[authentik_stages_deny.denystage, [name, user-username-check-deny]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, enrollment-invitation]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
+    
+    # Binding 5: User write stage (order: 30)
     entries.append({
         "model": "authentik_flows.flowstagebinding",
         "identifiers": {
@@ -333,7 +458,7 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Binding 4: Redirect stage (order: 40) - This has the ID for !KeyOf reference
+    # Binding 6: Redirect stage (order: 40) - This has the ID for !KeyOf reference
     entries.append({
         "model": "authentik_flows.flowstagebinding",
         "id": "local-flow-binding",
@@ -352,15 +477,54 @@ def generate_blueprint(
     })
     
     # ================================================================
-    # 8. POLICY BINDING (Attach save-user-attributes to the redirect stage)
+    # 8. POLICY BINDINGS FOR enrollment-invitation
     # ================================================================
     
+    # Policy Binding: save-user-attributes to redirect stage (order: 0)
     entries.append({
         "model": "authentik_policies.policybinding",
         "identifiers": {
             "order": 0,
             "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, save-user-attributes]]",
             "target": "!KEYOF_MARKER:local-flow-binding"
+        },
+        "attrs": {
+            "enabled": True,
+            "failure_result": False,
+            "group": None,
+            "negate": False,
+            "timeout": 30,
+            "user": None
+        },
+        "state": "present"
+    })
+    
+    # Policy Binding: check-email-exist-policy to email check deny stage (order: 0)
+    entries.append({
+        "model": "authentik_policies.policybinding",
+        "identifiers": {
+            "order": 0,
+            "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, check-email-exist-policy]]",
+            "target": "!KEYOF_MARKER:email-check-binding"
+        },
+        "attrs": {
+            "enabled": True,
+            "failure_result": False,
+            "group": None,
+            "negate": False,
+            "timeout": 30,
+            "user": None
+        },
+        "state": "present"
+    })
+    
+    # Policy Binding: check-username-exist-policy to username check deny stage (order: 0)
+    entries.append({
+        "model": "authentik_policies.policybinding",
+        "identifiers": {
+            "order": 0,
+            "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, check-username-exist-policy]]",
+            "target": "!KEYOF_MARKER:username-check-binding"
         },
         "attrs": {
             "enabled": True,
@@ -589,7 +753,7 @@ def main():
     logout_uri = os.getenv("AUTHENTIK_LOGOUT_URI", redirect_uris[-1] if redirect_uris else "")
     output_file = os.getenv("AUTHENTIK_OUTPUT_FILE", "authentik-blueprint.yaml")
     
-    print("🚀 Generating Authentik Blueprint...")
+    print("🚀 Generating IDP Authentik Blueprint...")
     print(f"📋 App Name: {app_name}")
     print(f"📋 Provider: {provider_name}")
     print(f"🔗 Redirect URIs: {len(redirect_uris)} configured")
@@ -625,15 +789,22 @@ def main():
     
     print("\n📋 Components included:")
     print("  ✅ enrollment-invitation Flow")
+    print("    - enrollment-invitation (Invitation Stage)")
+    print("    - user-email-check-deny (Deny Stage with email check policy)")
+    print("    - default-source-enrollment-prompt (Prompt Stage)")
+    print("    - user-username-check-deny (Deny Stage with username check policy)")
+    print("    - enrollment-invitation-write (User Write Stage)")
+    print("    - redirect-logout-stage (Redirect Stage)")
     print("  ✅ app-auth-flow")
     print("  ✅ app-invalidation-flow with default-invalidation-logout + redirect-logout-stage")
     print("  ✅ save-user-attributes Policy")
+    print("  ✅ check-email-exist-policy")
+    print("  ✅ check-username-exist-policy")
     print("  ✅ redirect-logout-stage")
     print("  ✅ enrollment-invitation-write")
-    print("  ✅ enrollment-invitation (invitation stage)")
     print("  ✅ orgId Prompt")
     print("  ✅ All Flow Stage Bindings")
-    print("  ✅ Policy Binding with !KeyOf")
+    print("  ✅ Policy Bindings with !KeyOf")
     print("  ✅ OAuth2 Provider with logout_uri")
     print("  ✅ Application")
     print(f"\n✅ Done! You can now import this blueprint in authentik.")

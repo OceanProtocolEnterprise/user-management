@@ -67,6 +67,18 @@ entries:
     attrs:
       continue_flow_without_invitation: false
     state: present
+  - model: authentik_stages_deny.denystage
+    identifiers:
+      name: user-email-check-deny
+    attrs:
+      deny_message: Email already exists! Contact admin.
+    state: present
+  - model: authentik_stages_deny.denystage
+    identifiers:
+      name: user-username-check-deny
+    attrs:
+      deny_message: Username already exists! Try another one.
+    state: present
   - model: authentik_stages_prompt.prompt
     identifiers:
       name: orgId
@@ -134,6 +146,25 @@ entries:
         \    \n    if signer_server:\n        user.attributes[\"signerServer\"] =
         signer_server\n    \n    user.save()\n\nreturn True"
     state: present
+  - model: authentik_policies_expression.expressionpolicy
+    identifiers:
+      name: check-email-exist-policy
+    attrs:
+      execution_logging: true
+      expression: "from authentik.core.models import User\n\nemail = request.context.get(\"\
+        prompt_data\", {}).get(\"email\")\n\nif not email:\n    return False\n\nexists
+        = User.objects.filter(email__iexact=email).exists()\n\nreturn exists"
+    state: present
+  - model: authentik_policies_expression.expressionpolicy
+    identifiers:
+      name: check-username-exist-policy
+    attrs:
+      execution_logging: true
+      expression: "from authentik.core.models import User\n\nusername = request.context.get(\"\
+        prompt_data\", {}).get(\"username\")\n\nif not username:\n    return False\n\
+        \nexists = User.objects.filter(username__iexact=username).exists()\n\nreturn
+        exists"
+    state: present
   - model: authentik_flows.flowstagebinding
     identifiers:
       order: 10
@@ -146,9 +177,33 @@ entries:
       re_evaluate_policies: true
     state: present
   - model: authentik_flows.flowstagebinding
+    id: email-check-binding
+    identifiers:
+      order: 15
+      stage: !Find [authentik_stages_deny.denystage, [name, user-email-check-deny]]
+      target: !Find [authentik_flows.flow, [slug, enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
     identifiers:
       order: 20
       stage: !Find [authentik_stages_prompt.promptstage, [name, default-source-enrollment-prompt]]
+      target: !Find [authentik_flows.flow, [slug, enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    id: username-check-binding
+    identifiers:
+      order: 25
+      stage: !Find [authentik_stages_deny.denystage, [name, user-username-check-deny]]
       target: !Find [authentik_flows.flow, [slug, enrollment-invitation]]
     attrs:
       evaluate_on_plan: false
@@ -193,6 +248,34 @@ entries:
       timeout: 30
       user:
     state: present
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name,
+        check-email-exist-policy]]
+      target: !KeyOf email-check-binding
+    attrs:
+      enabled: true
+      failure_result: false
+      group:
+      negate: false
+      timeout: 30
+      user:
+    state: present
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name,
+        check-username-exist-policy]]
+      target: !KeyOf username-check-binding
+    attrs:
+      enabled: true
+      failure_result: false
+      group:
+      negate: false
+      timeout: 30
+      user:
+    state: present
   - model: authentik_flows.flowstagebinding
     identifiers:
       order: 10
@@ -222,8 +305,8 @@ entries:
       name: vm1-federated-provider
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, app-invalidation-flow]]
-      client_id: owq1ex3ym1owsk7p1007vi1lke19keo6
-      client_secret: 2o_4QX9ePNR3KZRxhQY6C0jcIqI3BtpG3wUllouBRRJ
+      client_id: woom6ip5bb68zgu1kyu2pg50cjl9axq3
+      client_secret: lMN72-jYR2Tz0AAYJGpZvn5sLvkqC9raNL4_TJODHl-
       client_type: confidential
       grant_types:
         - authorization_code
