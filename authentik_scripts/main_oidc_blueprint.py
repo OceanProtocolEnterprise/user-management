@@ -7,6 +7,7 @@ Generates a complete blueprint YAML file for the main authentik instance with:
 - OAuth Source Property Mapping
 - Scope Mappings
 - All necessary flows, stages, and bindings
+- Saves generated client credentials to .env file
 """
 
 import os
@@ -14,7 +15,7 @@ import secrets
 import string
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 
 try:
     from ruamel.yaml import YAML
@@ -49,6 +50,49 @@ def generate_redirect_uris(redirect_uris_list: List[str]) -> List[Dict[str, Any]
         for url in redirect_uris_list
     ]
 
+def save_credentials_to_env(client_id: str, client_secret: str, env_file: str = ".env"):
+    """Save generated client credentials to .env file"""
+    try:
+        # Read existing .env file
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                content = f.read()
+        else:
+            content = ""
+        
+        # Check if credentials already exist in .env
+        if "AUTHENTIK_CLIENT_ID=" in content:
+            # Replace existing client ID
+            import re
+            content = re.sub(r'AUTHENTIK_CLIENT_ID=.*\n?', f'AUTHENTIK_CLIENT_ID={client_id}\n', content)
+        else:
+            # Add new client ID (ensure newline before adding)
+            if content and not content.endswith('\n'):
+                content += '\n'
+            content += f'AUTHENTIK_CLIENT_ID={client_id}\n'
+        
+        if "AUTHENTIK_CLIENT_SECRET=" in content:
+            # Replace existing client secret
+            import re
+            content = re.sub(r'AUTHENTIK_CLIENT_SECRET=.*\n?', f'AUTHENTIK_CLIENT_SECRET={client_secret}\n', content)
+        else:
+            # Add new client secret (ensure newline before adding)
+            if content and not content.endswith('\n'):
+                content += '\n'
+            content += f'AUTHENTIK_CLIENT_SECRET={client_secret}\n'
+        
+        # Write back to .env file
+        with open(env_file, 'w') as f:
+            f.write(content)
+        
+        print(f"✅ Credentials saved to {env_file}")
+        print(f"   Client ID: {client_id}")
+        print(f"   Client Secret: {client_secret}")
+        return True
+    except Exception as e:
+        print(f"⚠️  Could not save credentials to .env: {e}")
+        return False
+
 def generate_blueprint(
     app_name: str = "main-oidc-app",
     app_slug: str = "main-oidc-app",
@@ -77,6 +121,9 @@ def generate_blueprint(
     # Generate random credentials
     client_id = generate_random_client_id()
     client_secret = generate_random_client_secret()
+    
+    # Save credentials to .env file
+    save_credentials_to_env(client_id, client_secret)
     
     # Define the blueprint structure
     blueprint = {
