@@ -1,6 +1,6 @@
 version: 1
 metadata:
-  name: Custom authentik Configuration - my-vm1-federated-app
+  name: Main Authentik Configuration - my-vm1-federated-app
   labels:
     blueprints.goauthentik.io/generated: 'false'
 entries:
@@ -32,6 +32,19 @@ entries:
     state: present
   - model: authentik_flows.flow
     identifiers:
+      slug: federated-jit-enrollment
+    attrs:
+      name: federated-jit-enrollment
+      title: Federated JIT Enrollment
+      designation: enrollment
+      authentication: none
+      policy_engine_mode: any
+      compatibility_mode: false
+      denied_action: message_continue
+      layout: stacked
+    state: present
+  - model: authentik_flows.flow
+    identifiers:
       slug: enrollment-invitation
     attrs:
       name: enrollment-invitation
@@ -50,6 +63,16 @@ entries:
       mode: static
       target_static: https://market-git-feat-stage-ocean-enterprise.vercel.app/auth/callback/logout
       keep_context: true
+    state: present
+  - model: authentik_stages_user_write.userwritestage
+    identifiers:
+      name: create-jit-user
+    attrs:
+      create_users_as_inactive: false
+      create_users_group:
+      user_creation_mode: create_when_required
+      user_path_template: ''
+      user_type: internal
     state: present
   - model: authentik_stages_user_write.userwritestage
     identifiers:
@@ -79,6 +102,17 @@ entries:
     attrs:
       deny_message: Username already exists! Try another one.
     state: present
+  - model: authentik_stages_prompt.promptstage
+    identifiers:
+      name: default-source-enrollment-prompt
+    attrs:
+      fields:
+        - !Find [authentik_stages_prompt.prompt, [name, default-source-enrollment-field-username]]
+        - !Find [authentik_stages_prompt.prompt, [name, default-user-settings-field-name]]
+        - !Find [authentik_stages_prompt.prompt, [name, initial-setup-field-password]]
+        - !Find [authentik_stages_prompt.prompt, [name, initial-setup-field-password-repeat]]
+      validation_policies: []
+    state: present
   - model: authentik_stages_prompt.prompt
     identifiers:
       name: orgId
@@ -95,16 +129,23 @@ entries:
       initial_value_expression: false
       order: 100
     state: present
-  - model: authentik_stages_prompt.promptstage
+  - model: authentik_sources_oauth.oauthsourcepropertymapping
     identifiers:
-      name: default-source-enrollment-prompt
+      name: federated-oidc-mapping
     attrs:
-      fields:
-        - !Find [authentik_stages_prompt.prompt, [name, default-source-enrollment-field-username]]
-        - !Find [authentik_stages_prompt.prompt, [name, default-user-settings-field-name]]
-        - !Find [authentik_stages_prompt.prompt, [name, initial-setup-field-password]]
-        - !Find [authentik_stages_prompt.prompt, [name, initial-setup-field-password-repeat]]
-      validation_policies: []
+      name: federated-oidc-mapping
+      expression: "return {\n    \"username\": info.get(\"preferred_username\") or
+        info.get(\"nickname\") or info.get(\"sub\"),\n    \"email\": info.get(\"email\"\
+        ),\n    \"name\": info.get(\"name\") or info.get(\"given_name\") or \"Federated
+        User\",\n\n    \"attributes\": {\n        \"upstream_idp\": source.name if
+        source else \"unknown1\",\n        \"orgId\": info.get(\"orgId\", \"unknown1\"\
+        ),\n        \"walletId\": info.get(\"walletId\", \"unknown1\"),\n        \"\
+        signerServer\": info.get(\"signerServer\", \"unknown1\"),\n        \"external_subject\"\
+        : info.get(\"sub\"),\n        \"idp_issuer\": info.get(\"iss\"),\n    },\n\
+        \n    \"orgId\": info.get(\"orgId\", \"unknown7\"),\n    \"walletId\": info.get(\"\
+        walletId\", \"unknown7\"),\n    \"signerServer\": info.get(\"signerServer\"\
+        , \"unknown7\"),\n    \"upstream_idp\": source.name if source else \"unknown7\"\
+        ,\n    \"external_subject\": info.get(\"sub\"),\n}"
     state: present
   - model: authentik_providers_oauth2.scopemapping
     identifiers:
@@ -133,6 +174,15 @@ entries:
       expression: "return {\n    \"walletId\": request.user.attributes.get(\"walletId\"\
         , \"\")\n}"
     state: present
+  - model: authentik_providers_oauth2.scopemapping
+    identifiers:
+      name: federated_identity
+    attrs:
+      scope_name: federated_identity
+      description: Federated identity information
+      expression: "return {\n    \"upstream_idp\": request.user.attributes.get(\"\
+        upstream_idp\", \"unknown3\")\n}"
+    state: present
   - model: authentik_policies_expression.expressionpolicy
     identifiers:
       name: save-user-attributes
@@ -151,9 +201,15 @@ entries:
       name: check-email-exist-policy
     attrs:
       execution_logging: true
-      expression: "from authentik.core.models import User\n\nemail = request.context.get(\"\
+      expression: "from authentik.core.models import User\nfrom django.core.mail import
+        send_mail\nfrom django.conf import settings\n\nemail = request.context.get(\"\
         prompt_data\", {}).get(\"email\")\n\nif not email:\n    return False\n\nexists
-        = User.objects.filter(email__iexact=email).exists()\n\nreturn exists"
+        = User.objects.filter(email__iexact=email).exists()\n\nif exists:\n    send_mail(\n\
+        \        subject=\"Invitation attempted for existing user\",\n        message=(\n\
+        \            f\"An invitation was created for '{email}', \"\n            \"\
+        but a user with this email already exists.\"\n        ),\n        from_email=settings.DEFAULT_FROM_EMAIL,\n\
+        \        recipient_list=[\"ahmedrazach118@gmail.com\"],\n        fail_silently=False,\n\
+        \    )\n\nreturn exists"
     state: present
   - model: authentik_policies_expression.expressionpolicy
     identifiers:
@@ -164,6 +220,28 @@ entries:
         prompt_data\", {}).get(\"username\")\n\nif not username:\n    return False\n\
         \nexists = User.objects.filter(username__iexact=username).exists()\n\nreturn
         exists"
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 10
+      stage: !Find [authentik_stages_user_write.userwritestage, [name, create-jit-user]]
+      target: !Find [authentik_flows.flow, [slug, federated-jit-enrollment]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 20
+      stage: !Find [authentik_stages_user_login.userloginstage, [name, default-authentication-login]]
+      target: !Find [authentik_flows.flow, [slug, federated-jit-enrollment]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
     state: present
   - model: authentik_flows.flowstagebinding
     identifiers:
@@ -223,7 +301,7 @@ entries:
       re_evaluate_policies: true
     state: present
   - model: authentik_flows.flowstagebinding
-    id: local-flow-binding
+    id: redirect-binding
     identifiers:
       order: 40
       stage: !Find [authentik_stages_redirect.redirectstage, [name, redirect-logout-stage]]
@@ -239,7 +317,7 @@ entries:
       order: 0
       policy: !Find [authentik_policies_expression.expressionpolicy, [name,
         save-user-attributes]]
-      target: !KeyOf local-flow-binding
+      target: !KeyOf redirect-binding
     attrs:
       enabled: true
       failure_result: false
@@ -305,8 +383,8 @@ entries:
       name: vm1-federated-provider
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, app-invalidation-flow]]
-      client_id: woom6ip5bb68zgu1kyu2pg50cjl9axq3
-      client_secret: lMN72-jYR2Tz0AAYJGpZvn5sLvkqC9raNL4_TJODHl-
+      client_id: oyo2i1mcyb1qazx6i18xyejkvz36q2zy
+      client_secret: 8KDQV-bF9vFsXQhoGQid_UWJoZ27D9dniBSiBYyvObN
       client_type: confidential
       grant_types:
         - authorization_code
@@ -330,6 +408,7 @@ entries:
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, organizationId]]
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, signerServer]]
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, walletId]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, federated_identity]]
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]

@@ -201,9 +201,15 @@ entries:
       name: check-email-exist-policy
     attrs:
       execution_logging: true
-      expression: "from authentik.core.models import User\n\nemail = request.context.get(\"\
+      expression: "from authentik.core.models import User\nfrom django.core.mail import
+        send_mail\nfrom django.conf import settings\n\nemail = request.context.get(\"\
         prompt_data\", {}).get(\"email\")\n\nif not email:\n    return False\n\nexists
-        = User.objects.filter(email__iexact=email).exists()\n\nreturn exists"
+        = User.objects.filter(email__iexact=email).exists()\n\nif exists:\n    send_mail(\n\
+        \        subject=\"Invitation attempted for existing user\",\n        message=(\n\
+        \            f\"An invitation was created for '{email}', \"\n            \"\
+        but a user with this email already exists.\"\n        ),\n        from_email=settings.DEFAULT_FROM_EMAIL,\n\
+        \        recipient_list=[\"ahmedrazach118@gmail.com\"],\n        fail_silently=False,\n\
+        \    )\n\nreturn exists"
     state: present
   - model: authentik_policies_expression.expressionpolicy
     identifiers:
@@ -377,8 +383,8 @@ entries:
       name: main-oidc-provider
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, app-invalidation-flow]]
-      client_id: 8g22jjsqkjvg2vl3hh75adnjhq3rr15d
-      client_secret: 3TI0e_nl_NKzKC6X-FG8OcoZSXjEPwMo4N58N9RpQW8
+      client_id: hrbbqjz6p20n5eg1ssvsj4sqidvkgpfi
+      client_secret: O4NsT45JFg1-s053ybHSwdW_EZx62Bxpa4ONrBxl-Xr
       client_type: confidential
       grant_types:
         - authorization_code

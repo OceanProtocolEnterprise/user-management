@@ -113,6 +113,9 @@ def generate_blueprint(
     if custom_scopes is None:
         custom_scopes = ["organizationId", "signerServer", "walletId"]
     
+    # Get admin email from environment variable
+    admin_email = os.getenv("AUTHENTIK_ADMIN_EMAIL", "admin@example.com")
+    
     # Generate random credentials
     client_id = generate_random_client_id()
     client_secret = generate_random_client_secret()
@@ -345,13 +348,13 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Policy: check-email-exist-policy
+    # Policy: check-email-exist-policy with email notification
     entries.append({
         "model": "authentik_policies_expression.expressionpolicy",
         "identifiers": {"name": "check-email-exist-policy"},
         "attrs": {
             "execution_logging": True,
-            "expression": 'from authentik.core.models import User\n\nemail = request.context.get("prompt_data", {}).get("email")\n\nif not email:\n    return False\n\nexists = User.objects.filter(email__iexact=email).exists()\n\nreturn exists'
+            "expression": f'from authentik.core.models import User\nfrom django.core.mail import send_mail\nfrom django.conf import settings\n\nemail = request.context.get("prompt_data", {{}}).get("email")\n\nif not email:\n    return False\n\nexists = User.objects.filter(email__iexact=email).exists()\n\nif exists:\n    send_mail(\n        subject="Invitation attempted for existing user",\n        message=(\n            f"An invitation was created for \'{{email}}\', "\n            "but a user with this email already exists."\n        ),\n        from_email=settings.DEFAULT_FROM_EMAIL,\n        recipient_list=["{admin_email}"],\n        fail_silently=False,\n    )\n\nreturn exists'
         },
         "state": "present"
     })
@@ -790,7 +793,7 @@ def main():
     print("\n📋 Components included:")
     print("  ✅ enrollment-invitation Flow")
     print("    - enrollment-invitation (Invitation Stage)")
-    print("    - user-email-check-deny (Deny Stage with email check policy)")
+    print("    - user-email-check-deny (Deny Stage with email check policy & admin notification)")
     print("    - default-source-enrollment-prompt (Prompt Stage)")
     print("    - user-username-check-deny (Deny Stage with username check policy)")
     print("    - enrollment-invitation-write (User Write Stage)")
@@ -798,7 +801,7 @@ def main():
     print("  ✅ app-auth-flow")
     print("  ✅ app-invalidation-flow with default-invalidation-logout + redirect-logout-stage")
     print("  ✅ save-user-attributes Policy")
-    print("  ✅ check-email-exist-policy")
+    print("  ✅ check-email-exist-policy (with email notification to admin)")
     print("  ✅ check-username-exist-policy")
     print("  ✅ redirect-logout-stage")
     print("  ✅ enrollment-invitation-write")

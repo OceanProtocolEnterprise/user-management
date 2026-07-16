@@ -8,14 +8,16 @@ Generates a complete blueprint YAML file for the main authentik instance with:
 - Scope Mappings
 - All necessary flows, stages, and bindings
 - Saves generated client credentials to .env file
+- Email notification to admin when duplicate email is detected
 """
 
 import os
 import secrets
 import string
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 
 try:
     from ruamel.yaml import YAML
@@ -63,7 +65,6 @@ def save_credentials_to_env(client_id: str, client_secret: str, env_file: str = 
         # Check if credentials already exist in .env
         if "AUTHENTIK_CLIENT_ID=" in content:
             # Replace existing client ID
-            import re
             content = re.sub(r'AUTHENTIK_CLIENT_ID=.*\n?', f'AUTHENTIK_CLIENT_ID={client_id}\n', content)
         else:
             # Add new client ID (ensure newline before adding)
@@ -73,7 +74,6 @@ def save_credentials_to_env(client_id: str, client_secret: str, env_file: str = 
         
         if "AUTHENTIK_CLIENT_SECRET=" in content:
             # Replace existing client secret
-            import re
             content = re.sub(r'AUTHENTIK_CLIENT_SECRET=.*\n?', f'AUTHENTIK_CLIENT_SECRET={client_secret}\n', content)
         else:
             # Add new client secret (ensure newline before adding)
@@ -117,6 +117,9 @@ def generate_blueprint(
     
     if custom_scopes is None:
         custom_scopes = ["organizationId", "signerServer", "walletId", "federated_identity"]
+    
+    # Get admin email from environment variable
+    admin_email = os.getenv("AUTHENTIK_ADMIN_EMAIL", "admin@example.com")
     
     # Generate random credentials
     client_id = generate_random_client_id()
@@ -405,13 +408,13 @@ def generate_blueprint(
         "state": "present"
     })
     
-    # Policy: check-email-exist-policy
+    # Policy: check-email-exist-policy with email notification
     entries.append({
         "model": "authentik_policies_expression.expressionpolicy",
         "identifiers": {"name": "check-email-exist-policy"},
         "attrs": {
             "execution_logging": True,
-            "expression": 'from authentik.core.models import User\n\nemail = request.context.get("prompt_data", {}).get("email")\n\nif not email:\n    return False\n\nexists = User.objects.filter(email__iexact=email).exists()\n\nreturn exists'
+            "expression": f'from authentik.core.models import User\nfrom django.core.mail import send_mail\nfrom django.conf import settings\n\nemail = request.context.get("prompt_data", {{}}).get("email")\n\nif not email:\n    return False\n\nexists = User.objects.filter(email__iexact=email).exists()\n\nif exists:\n    send_mail(\n        subject="Invitation attempted for existing user",\n        message=(\n            f"An invitation was created for \'{{email}}\', "\n            "but a user with this email already exists."\n        ),\n        from_email=settings.DEFAULT_FROM_EMAIL,\n        recipient_list=["{admin_email}"],\n        fail_silently=False,\n    )\n\nreturn exists'
         },
         "state": "present"
     })
@@ -857,7 +860,7 @@ def main():
     print("\n📋 Components included:")
     print("  ✅ Enrollment Invitation Flow (enrollment-invitation)")
     print("    - enrollment-invitation (Invitation Stage)")
-    print("    - user-email-check-deny (Deny Stage with email check policy)")
+    print("    - user-email-check-deny (Deny Stage with email check policy & admin notification)")
     print("    - default-source-enrollment-prompt (Prompt Stage)")
     print("    - user-username-check-deny (Deny Stage with username check policy)")
     print("    - enrollment-invitation-write (User Write Stage)")
@@ -874,7 +877,7 @@ def main():
     print("  ✅ app-auth-flow")
     print("  ✅ app-invalidation-flow with default-invalidation-logout + redirect-logout-stage")
     print("  ✅ save-user-attributes Policy")
-    print("  ✅ check-email-exist-policy")
+    print("  ✅ check-email-exist-policy (with email notification to admin)")
     print("  ✅ check-username-exist-policy")
     print("  ✅ redirect-logout-stage")
     print("  ✅ orgId Prompt")
