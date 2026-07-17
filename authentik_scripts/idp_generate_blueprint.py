@@ -3,7 +3,7 @@
 Authentik IDP Blueprint Generator
 Generates a complete blueprint YAML file for IDP authentik with custom configurations
 Includes: enrollment invitation flow, custom policies, mappings, stages, provider, and application
-Saves generated client credentials to .env file
+Saves generated client credentials, JWKS URI, Issuer, and Audience to .env file
 """
 
 import os
@@ -12,6 +12,7 @@ import string
 import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 try:
@@ -47,9 +48,26 @@ def generate_redirect_uris(redirect_uris_list: List[str]) -> List[Dict[str, Any]
         for url in redirect_uris_list
     ]
 
-def save_credentials_to_env(client_id: str, client_secret: str, env_file: str = ".env"):
-    """Save generated client credentials to .env file"""
+def save_credentials_to_env(client_id: str, client_secret: str, base_url: str, app_slug: str, env_file: str = ".env"):
+    """Save generated client credentials, JWKS URI, Issuer, and Audience to .env file"""
     try:
+        # Ensure base_url ends with /
+        if not base_url.endswith('/'):
+            base_url += '/'
+        
+        # Generate JWKS URI, Issuer, and Audience
+        jwks_uri = f"{base_url}application/o/{app_slug}/jwks/"
+        issuer = f"{base_url}application/o/{app_slug}/"
+        audience = client_id  # Client ID is used as Audience
+        
+        # Define all environment variables to set (excluding AUTHENTIK_CLIENT_ID)
+        env_vars = {
+            "AUTHENTIK_AUDIENCE": audience,
+            "AUTHENTIK_CLIENT_SECRET": client_secret,
+            "AUTHENTIK_JWKS_URI": jwks_uri,
+            "AUTHENTIK_ISSUER": issuer
+        }
+        
         # Read existing .env file
         if os.path.exists(env_file):
             with open(env_file, 'r') as f:
@@ -57,32 +75,30 @@ def save_credentials_to_env(client_id: str, client_secret: str, env_file: str = 
         else:
             content = ""
         
-        # Check if credentials already exist in .env
-        if "AUTHENTIK_CLIENT_ID=" in content:
-            # Replace existing client ID
-            content = re.sub(r'AUTHENTIK_CLIENT_ID=.*\n?', f'AUTHENTIK_CLIENT_ID={client_id}\n', content)
-        else:
-            # Add new client ID (ensure newline before adding)
-            if content and not content.endswith('\n'):
-                content += '\n'
-            content += f'AUTHENTIK_CLIENT_ID={client_id}\n'
+        # Remove any existing AUTHENTIK_CLIENT_ID from the file (cleanup)
+        content = re.sub(r'^AUTHENTIK_CLIENT_ID=.*$\n?', '', content, flags=re.MULTILINE)
         
-        if "AUTHENTIK_CLIENT_SECRET=" in content:
-            # Replace existing client secret
-            content = re.sub(r'AUTHENTIK_CLIENT_SECRET=.*\n?', f'AUTHENTIK_CLIENT_SECRET={client_secret}\n', content)
-        else:
-            # Add new client secret (ensure newline before adding)
-            if content and not content.endswith('\n'):
-                content += '\n'
-            content += f'AUTHENTIK_CLIENT_SECRET={client_secret}\n'
+        # Update each environment variable
+        for var_name, var_value in env_vars.items():
+            pattern = re.compile(rf'^{var_name}=.*$', re.MULTILINE)
+            if pattern.search(content):
+                # Replace existing variable
+                content = pattern.sub(f'{var_name}={var_value}', content)
+            else:
+                # Add new variable (ensure newline before adding)
+                if content and not content.endswith('\n'):
+                    content += '\n'
+                content += f'{var_name}={var_value}\n'
         
         # Write back to .env file
         with open(env_file, 'w') as f:
             f.write(content)
         
         print(f"✅ Credentials saved to {env_file}")
-        print(f"   Client ID: {client_id}")
+        print(f"   Audience (Client ID): {audience}")
         print(f"   Client Secret: {client_secret}")
+        print(f"   JWKS URI: {jwks_uri}")
+        print(f"   Issuer: {issuer}")
         return True
     except Exception as e:
         print(f"⚠️  Could not save credentials to .env: {e}")
@@ -94,7 +110,8 @@ def generate_blueprint(
     provider_name: str = "vm1-federated-provider",
     redirect_uris: List[str] = None,
     logout_uri: str = "",
-    custom_scopes: List[str] = None
+    custom_scopes: List[str] = None,
+    base_url: str = ""
 ) -> Dict[str, Any]:
     """
     Generate the complete blueprint structure
@@ -116,12 +133,16 @@ def generate_blueprint(
     # Get admin email from environment variable
     admin_email = os.getenv("AUTHENTIK_ADMIN_EMAIL", "admin@example.com")
     
+    # Get base URL from environment variable
+    if not base_url:
+        base_url = os.getenv("AUTHENTIK_BASE_URL", "")
+    
     # Generate random credentials
     client_id = generate_random_client_id()
     client_secret = generate_random_client_secret()
     
-    # Save credentials to .env file
-    save_credentials_to_env(client_id, client_secret)
+    # Save credentials to .env file (including JWKS, Issuer, Audience)
+    save_credentials_to_env(client_id, client_secret, base_url, app_slug)
     
     # Define the blueprint structure
     blueprint = {
@@ -740,6 +761,7 @@ def main():
     app_name = os.getenv("AUTHENTIK_APP_NAME", "my-vm1-federated-app")
     app_slug = os.getenv("AUTHENTIK_APP_SLUG", "vm1-federated-app")
     provider_name = os.getenv("AUTHENTIK_PROVIDER_NAME", "vm1-federated-provider")
+    base_url = os.getenv("AUTHENTIK_BASE_URL", "")
     
     # Read redirect URIs from .env file
     redirect_uris_env = os.getenv("AUTHENTIK_REDIRECT_URIS", "")
@@ -753,6 +775,10 @@ def main():
         ]
         print("⚠️  No AUTHENTIK_REDIRECT_URIS found in .env, using defaults")
     
+    if not base_url:
+        print("⚠️  No AUTHENTIK_BASE_URL found in .env. Please set it.")
+        base_url = "https://your-authentik-instance.com/"
+    
     logout_uri = os.getenv("AUTHENTIK_LOGOUT_URI", redirect_uris[-1] if redirect_uris else "")
     output_file = os.getenv("AUTHENTIK_OUTPUT_FILE", "authentik-blueprint.yaml")
     
@@ -761,6 +787,7 @@ def main():
     print(f"📋 Provider: {provider_name}")
     print(f"🔗 Redirect URIs: {len(redirect_uris)} configured")
     print(f"🔗 Logout URI: {logout_uri}")
+    print(f"🔗 Base URL: {base_url}")
     print("")
     
     # Generate the blueprint
@@ -769,7 +796,8 @@ def main():
         app_slug=app_slug,
         provider_name=provider_name,
         redirect_uris=redirect_uris,
-        logout_uri=logout_uri
+        logout_uri=logout_uri,
+        base_url=base_url
     )
     
     # Save the blueprint
@@ -782,7 +810,7 @@ def main():
     provider_entry = find_provider_entry(blueprint)
     if provider_entry:
         attrs = provider_entry.get("attrs", {})
-        print(f"  ✅ Client ID: {attrs.get('client_id', 'N/A')}")
+        print(f"  ✅ Client ID / Audience: {attrs.get('client_id', 'N/A')}")
         print(f"  ✅ Client Secret: {attrs.get('client_secret', 'N/A')}")
         print(f"  ✅ Redirect URIs: {len(attrs.get('redirect_uris', []))}")
         print(f"  ✅ Logout URI: {attrs.get('logout_uri', 'N/A')}")
@@ -810,6 +838,11 @@ def main():
     print("  ✅ Policy Bindings with !KeyOf")
     print("  ✅ OAuth2 Provider with logout_uri")
     print("  ✅ Application")
+    print("\n📁 Environment variables saved to .env:")
+    print("  ✅ AUTHENTIK_AUDIENCE (Client ID)")
+    print("  ✅ AUTHENTIK_CLIENT_SECRET")
+    print("  ✅ AUTHENTIK_JWKS_URI")
+    print("  ✅ AUTHENTIK_ISSUER")
     print(f"\n✅ Done! You can now import this blueprint in authentik.")
     print(f"📁 File: {output_file}")
 

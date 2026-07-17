@@ -383,8 +383,8 @@ entries:
       name: main-oidc-provider
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, app-invalidation-flow]]
-      client_id: hrbbqjz6p20n5eg1ssvsj4sqidvkgpfi
-      client_secret: O4NsT45JFg1-s053ybHSwdW_EZx62Bxpa4ONrBxl-Xr
+      client_id: paru1ficaqtrm5g9ei2dmbgxmvar7xzp
+      client_secret: P9E_dAcqlf9VinPiVbO5S9z96tCW23XHmPJIrrAoL5J
       client_type: confidential
       grant_types:
         - authorization_code
