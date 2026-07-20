@@ -1,6 +1,6 @@
 version: 1
 metadata:
-  name: Custom authentik Configuration - my-vm1-federated-app
+  name: Custom authentik Configuration - my-vm3-federated-app
   labels:
     blueprints.goauthentik.io/generated: 'false'
 entries:
@@ -158,7 +158,7 @@ entries:
         \        subject=\"Invitation attempted for existing user\",\n        message=(\n\
         \            f\"An invitation was created for '{email}', \"\n            \"\
         but a user with this email already exists.\"\n        ),\n        from_email=settings.DEFAULT_FROM_EMAIL,\n\
-        \        recipient_list=[\"ahmedrazach118@gmail.com\"],\n        fail_silently=False,\n\
+        \        recipient_list=[\"maria.cretu@triumviratelabs.ro\"],\n        fail_silently=False,\n\
         \    )\n\nreturn exists"
     state: present
   - model: authentik_policies_expression.expressionpolicy
@@ -306,13 +306,13 @@ entries:
     state: present
   - model: authentik_providers_oauth2.oauth2provider
     identifiers:
-      name: vm1-federated-provider
+      name: vm3-federated-provider
     attrs:
-      name: vm1-federated-provider
+      name: vm3-federated-provider
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, app-invalidation-flow]]
-      client_id: gsqrz5hxyff8m9cnvyxfflhc7e23mmb7
-      client_secret: 2OMyBnoWKil57-eR-poRWYEYbLQiWyhKP2SVRPN2sgZ
+      client_id: limkms47veatpujovbwsi7mdyjsptcpr
+      client_secret: b0tQanUD52IehUHIdOiC9bl2hLIejcEQ7DLLenzzeYx
       client_type: confidential
       grant_types:
         - authorization_code
@@ -353,10 +353,10 @@ entries:
     state: present
   - model: authentik_core.application
     identifiers:
-      slug: vm1-federated-app
+      slug: vm3-federated-app
     attrs:
-      name: my-vm1-federated-app
-      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, vm1-federated-provider]]
+      name: my-vm3-federated-app
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, vm3-federated-provider]]
       policy_engine_mode: any
       meta_description: ''
       meta_icon: ''
