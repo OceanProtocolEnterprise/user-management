@@ -1,0 +1,15 @@
+# Authentik Blueprint Automation Dependencies
+# ===========================================
+
+# Core dependencies
+python-dotenv>=1.0.0
+ruamel.yaml>=0.17.21
+
+# Optional dependencies
+pyyaml>=6.0.1
+
+# Development dependencies (optional)
+pytest>=7.4.0
+black>=23.9.0
+flake8>=6.1.0
+is-safe-url>=1.0.0

@@ -1,7 +1,5 @@
-.env
 node_modules/
 dist/
 build/
-docker-compose/.env
-docker-compose/certs/
 .venv/
+docker-compose/openbao/secrets/private_keys

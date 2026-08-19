@@ -1,0 +1,23 @@
+tls:
+  # Default certificate served when no per-host cert matches the SNI.
+  # Leave commented out to use Traefik's built-in self-signed certificate.
+  #
+  # stores:
+  #   default:
+  #     defaultCertificate:
+  #       certFile: /certs/default.crt
+  #       keyFile: /certs/default.key
+
+  # Per-host certificates, matched by SNI against the CN/SAN inside the
+  # certificate — not by filename. Non-matching requests fall back to the
+  # default above.
+  certificates:
+    - certFile: /certs/fullchain.pem
+      keyFile: /certs/privkey.pem
+  #   - certFile: /certs/signer.example.com.crt
+  #     keyFile: /certs/signer.example.com.key
+
+  options:
+    default:
+      minVersion: VersionTLS12
+

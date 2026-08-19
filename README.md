@@ -121,4 +121,23 @@ python3 main_oidc_blueprint.py --env .env_main
 
 python3 idp_generate_blueprint.py --env .env_idp
 
+# /////////////////////////////Federation and Social Login Source Onboarding \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+# running federation source file in authentik docker
+#Step 1 
+# create config-for-onboarding-tvl-participant.json and Copy the script to container
+# pwd :: ubuntu@vm1-stage:~/user-management/dataspace-operator
+nano config-for-onboarding-tvl-participant.json
+docker cp config-for-onboarding-tvl-participant.json authentik-server:/tmp/
 
+#Step 2 
+# create create_oauth_source.py and Copy the script to container
+# pwd :: ubuntu@vm1-stage:~/user-management/dataspace-operator/authentik$ 
+nano create_federation_source.py
+docker cp create_federation_source.py authentik-server:/tmp/
+
+# step 3 run this command 
+# pwd :: ubuntu@vm1-stage:~/user-management/dataspace-operator/authentik$ 
+docker exec -it authentik-server \
+  /ak-root/.venv/bin/python \
+  /tmp/create_federation_source.py \
+  --config /tmp/config-for-onboarding-tvl-participant.json
