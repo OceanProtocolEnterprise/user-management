@@ -528,6 +528,7 @@ def main():
     
     wallet_ui_configurable = {
         "NUXT_PUBLIC_LOGOUT_REDIRECT_URI": wallet_ui_url,
+        "NUXT_ADMIN_USER_GROUP_NAME": config["NUXT_ADMIN_USER_GROUP_NAME"]
     }
     
     wallet_ui_generated = {

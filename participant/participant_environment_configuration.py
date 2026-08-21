@@ -602,12 +602,13 @@ def main():
         "SERVICE_HOST": DEFAULTS_PARTICIPANT["SERVICE_HOST"],
         "DATABASE_ENGINE": DEFAULTS_PARTICIPANT["DATABASE_ENGINE"],
         "NUXT_WALLET_API_INTERNAL": DEFAULTS_PARTICIPANT["NUXT_WALLET_API_INTERNAL"],
-        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
+        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
+        "NUXT_ADMIN_USER_GROUP_NAME": config["NUXT_ADMIN_USER_GROUP_NAME"]
     }
     wallet_ui_sections = [
         ("Configurable (sourced from .env.config)", {k: wallet_ui_vars[k] for k in [
             "NUXT_PUBLIC_LOGOUT_REDIRECT_URI", "NUXT_CLIENT_SECRET",
-            "NUXT_TOKEN_URL", "NUXT_PUBLIC_CLIENT_ID", "NUXT_PUBLIC_ISSUER"
+            "NUXT_TOKEN_URL", "NUXT_PUBLIC_CLIENT_ID", "NUXT_PUBLIC_ISSUER", "NUXT_ADMIN_USER_GROUP_NAME"
         ]}),
         ("Generated", {k: wallet_ui_vars[k] for k in [
             "NUXT_PUBLIC_REDIRECT_URI",
