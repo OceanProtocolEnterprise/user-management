@@ -82,6 +82,7 @@ services:
 
   authentik-server:
     image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:?}
+    pull_policy: missing
     container_name: authentik-server
     command: server
     restart: unless-stopped
@@ -119,6 +120,7 @@ services:
 
   authentik-worker:
     image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:?}
+    pull_policy: missing
     container_name: authentik-worker
     command: worker
     restart: unless-stopped
