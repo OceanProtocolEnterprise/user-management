@@ -4,7 +4,6 @@ set -euo pipefail
 # Config
 PYTHON=${PYTHON_BIN:-python3}
 VENV_DIR=".venv"
-ENV_FILE=".env"
 ENV_TEMP_FILE=".env.tmp"
 ENV_CONFIG=".env.config"
 CONFIG_SCRIPT="participant_environment_configuration.py"
@@ -197,7 +196,6 @@ fi
 
 # 9. Distribute .env files to docker-compose subdirectories
 echo "==> Distributing .env files to docker-compose..."
-mv $ENV_FILE $COMPOSE_DIR 
 
 distribute_env() {
   local src="$1" dest="${COMPOSE_DIR}/$2"

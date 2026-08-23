@@ -17,27 +17,22 @@ DEFAULTS_OPERATOR = {
     "SERVICE_HOST": "localhost",
     "DATABASE_ENGINE": "postgres",
     "NUXT_WALLET_API_INTERNAL": "http://wallet-api:7001/wallet-api",
-    "WALLET_API_TAG": "gaiax-0.1.1-OE",
     "WALLET_BACKEND_PORT": "7001",
     "DB_NAME": "waltid",
     "DB_USERNAME": "waltid",
     "POSTGRES_DB_PORT": "5432",
     "POSTGRES_DB_HOST": "postgres",
     "POSTGRES_DB_DATA": "/waltid-wallet-api/data/",
-    "POSTGRES_TAG": "18",
-    "DEV_WALLET_TAG": "gaiax-0.1.4-OE",
     "DEV_WALLET_FRONTEND_PORT": "7104",
     "DEMO_WALLET_FRONTEND_PORT": "7101",
     "OPENBAO_PORT": "8200",
     "PORT": 3001,
     "SIGNER_MODE": "vault",
-    "SIGNER_SERVER_TAG": "v0.5.3",
     "VAULT_URL": "https://openbao:8200",
     "VAULT_ETHEREUM_MOUNT": "ethereum",
     "VAULT_KV_STORE_PATH": "secret",
     "VAULT_TIMEOUT_MS": "10000",
     "AUTHENTIK_IMAGE": "ghcr.io/goauthentik/server",
-    "AUTHENTIK_TAG": "2026.5.5",
     "AUTHENTIK_PORT_HTTP": "9000",
     "AUTHENTIK_PORT_HTTPS": "9443",
     "SMTP_HOST": "host-gateway",
@@ -154,6 +149,52 @@ def validate_config(config: Dict[str, str]) -> None:
 
 def quote_password(value: str) -> str:
     return f"'{value}'"
+
+def append_new_env_vars(filepath: str, variables: Dict[str, str]) -> None:
+    """Appends new keys and updates existing keys in a .env file without modifying other content."""
+
+    existing_lines = []
+    existing_keys = set()
+
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as f:
+            existing_lines = f.readlines()
+
+        for line in existing_lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#') and '=' in stripped:
+                existing_keys.add(stripped.split('=', 1)[0].strip())
+
+    # Update existing keys in place
+    new_lines = []
+    updated_keys = set()
+
+    for line in existing_lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#') and '=' in stripped:
+            key = stripped.split('=', 1)[0].strip()
+            if key in variables:
+                new_lines.append(f"{key}={variables[key]}\n")
+                updated_keys.add(key)
+                print(f" Updated: {key}={variables[key]}")
+                continue
+        new_lines.append(line)
+
+    # Write back updated lines
+    with open(filepath, 'w') as f:
+        f.writelines(new_lines)
+
+    # Append keys that were not already in the file
+    new_vars = {k: v for k, v in variables.items() if k not in updated_keys}
+
+    if new_vars:
+        with open(filepath, 'a') as f:
+            f.write("\n")
+            for key, value in new_vars.items():
+                f.write(f"{key}={value}\n")
+                print(f"  + Appended: {key}={value}")
+
+    print(f" Updated: {filepath}")
 
 def update_env_file(filepath: str, variables: Dict[str, str], preserve_vars: List[str] = None) -> None:
     if preserve_vars is None:
@@ -354,7 +395,6 @@ def main():
     
     authentik_defaults = {
         "AUTHENTIK_IMAGE": DEFAULTS_OPERATOR["AUTHENTIK_IMAGE"],
-        "AUTHENTIK_TAG": DEFAULTS_OPERATOR["AUTHENTIK_TAG"],
         "AUTHENTIK_PORT_HTTP": DEFAULTS_OPERATOR["AUTHENTIK_PORT_HTTP"],
         "AUTHENTIK_PORT_HTTPS": DEFAULTS_OPERATOR["AUTHENTIK_PORT_HTTPS"],
         "AUTHENTIK_POSTGRESQL__NAME": DEFAULTS_OPERATOR["AUTHENTIK_POSTGRESQL__NAME"],
@@ -398,7 +438,6 @@ def main():
     
     print("  Processing .env.postgres...")
     postgres_vars = {
-        "POSTGRES_TAG": DEFAULTS_OPERATOR["POSTGRES_TAG"],
         "DB_NAME": DEFAULTS_OPERATOR["DB_NAME"],
         "DB_USERNAME": DEFAULTS_OPERATOR["DB_USERNAME"],
         "POSTGRES_DB_PORT": DEFAULTS_OPERATOR["POSTGRES_DB_PORT"],
@@ -444,7 +483,6 @@ def main():
         "OPENBAO_PORT": DEFAULTS_OPERATOR["OPENBAO_PORT"],
         "PORT": DEFAULTS_OPERATOR["PORT"],
         "SIGNER_MODE": DEFAULTS_OPERATOR["SIGNER_MODE"],
-        "SIGNER_SERVER_TAG": DEFAULTS_OPERATOR["SIGNER_SERVER_TAG"],
         "VAULT_URL": DEFAULTS_OPERATOR["VAULT_URL"],
         "VAULT_ETHEREUM_MOUNT": DEFAULTS_OPERATOR["VAULT_ETHEREUM_MOUNT"],
         "VAULT_KV_STORE_PATH": DEFAULTS_OPERATOR["VAULT_KV_STORE_PATH"],
@@ -460,7 +498,7 @@ def main():
         ]}),
         ("Generated", {"UPSTREAM_IDP": signer_vars["UPSTREAM_IDP"], "HTTP_CERT_PATH": signer_vars["HTTP_CERT_PATH"], "HTTP_KEY_PATH": signer_vars["HTTP_KEY_PATH"]}),
         ("Default", {k: signer_vars[k] for k in [
-            "OPENBAO_PORT", "SIGNER_MODE", "SIGNER_SERVER_TAG", "PORT",
+            "OPENBAO_PORT", "SIGNER_MODE", "PORT",
             "VAULT_URL", "VAULT_ETHEREUM_MOUNT", "VAULT_KV_STORE_PATH",
             "VAULT_TIMEOUT_MS"
         ]}),
@@ -486,7 +524,6 @@ def main():
     print("  Processing .env.wallet-api...")
     wallet_api_vars = {
         "SERVICE_HOST": DEFAULTS_OPERATOR["SERVICE_HOST"],
-        "WALLET_API_TAG": DEFAULTS_OPERATOR["WALLET_API_TAG"],
         "WALLET_BACKEND_PORT": DEFAULTS_OPERATOR["WALLET_BACKEND_PORT"],
         "DB_NAME": DEFAULTS_OPERATOR["DB_NAME"],
         "DB_USERNAME": DEFAULTS_OPERATOR["DB_USERNAME"],
@@ -545,7 +582,6 @@ def main():
     wallet_ui_defaults = {
         "SERVICE_HOST": DEFAULTS_OPERATOR["SERVICE_HOST"],
         "DATABASE_ENGINE": DEFAULTS_OPERATOR["DATABASE_ENGINE"],
-        "DEV_WALLET_TAG": DEFAULTS_OPERATOR["DEV_WALLET_TAG"],
         "DEV_WALLET_FRONTEND_PORT": DEFAULTS_OPERATOR["DEV_WALLET_FRONTEND_PORT"],
         "DEMO_WALLET_FRONTEND_PORT": DEFAULTS_OPERATOR["DEMO_WALLET_FRONTEND_PORT"],
         "NUXT_WALLET_API_INTERNAL": DEFAULTS_OPERATOR["NUXT_WALLET_API_INTERNAL"],
@@ -565,26 +601,13 @@ def main():
 
     print("  Processing .env for root docker compose deployment...")
     env_vars = {
-        "WALLET_API_TAG": DEFAULTS_OPERATOR["WALLET_API_TAG"],
-        "DEV_WALLET_TAG": DEFAULTS_OPERATOR["DEV_WALLET_TAG"],
-        "SERVICE_HOST": DEFAULTS_OPERATOR["SERVICE_HOST"],
-        "AUTHENTIK_TAG": DEFAULTS_OPERATOR["AUTHENTIK_TAG"],
-        "SIGNER_SERVER_TAG": DEFAULTS_OPERATOR["SIGNER_SERVER_TAG"],
-        "WALLET_BACKEND_PORT": DEFAULTS_OPERATOR["WALLET_BACKEND_PORT"],
-        "NITRO_PORT": DEFAULTS_OPERATOR["NITRO_PORT"],
-        "PORT": DEFAULTS_OPERATOR["NITRO_PORT"],
-        "HOST": DEFAULTS_OPERATOR["HOST"],
-        "NITRO_HOST": DEFAULTS_OPERATOR["HOST"],
         "WALLET_API_HOST": urlparse(config["WALLET_API_URL"]).hostname,
         "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
     }
-    env_sections = [
-        ("Env Configuration", env_vars),
-    ]
-    ensure_env_file_structure(
-        os.path.join(script_dir, ".env"),
-        "DATASPACE OPERATOR — .env",
-        env_sections
+
+    append_new_env_vars(
+        os.path.join(script_dir, "docker-compose", ".env"),
+        env_vars,
     )
     
     

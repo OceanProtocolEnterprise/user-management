@@ -19,8 +19,6 @@ DEFAULTS_PARTICIPANT = {
     "SERVICE_HOST": "localhost",
     "DATABASE_ENGINE": "postgres",
     "NUXT_WALLET_API_INTERNAL": "http://wallet-api:7001/wallet-api",
-    "WALLET_API_TAG": "gaiax-0.1.1-OE",
-    "DEV_WALLET_TAG": "gaiax-0.1.4-OE",
     "WALLET_BACKEND_PORT": "7001",
     "DB_NAME": "waltid",
     "DB_USERNAME": "waltid",
@@ -30,14 +28,12 @@ DEFAULTS_PARTICIPANT = {
     "POSTGRES_TAG": "18",
     "OPENBAO_PORT": "8200",
     "SIGNER_MODE": "vault",
-    "SIGNER_SERVER_TAG": "v0.5.3",
     "PORT": 3001,
     "VAULT_URL": "https://openbao:8200",
     "VAULT_ETHEREUM_MOUNT": "ethereum",
     "VAULT_KV_STORE_PATH": "secret",
     "VAULT_TIMEOUT_MS": "10000",
     "AUTHENTIK_IMAGE": "ghcr.io/goauthentik/server",
-    "AUTHENTIK_TAG": "2026.5.5",
     "AUTHENTIK_PORT_HTTP": "9000",
     "AUTHENTIK_PORT_HTTPS": "9443",
     "SMTP_HOST": "host-gateway",
@@ -182,26 +178,51 @@ def fetch_oidc_config(well_known_url: str) -> Dict[str, Any]:
 def quote_password(value: str) -> str:
     return f"'{value}'"
 
-def generate_onboarding_json(config: Dict[str, str], consumer_key: str, consumer_secret: str, output_dir: str) -> None:
-    participant_idp_well_known = (
-        f"https://{config['PARTICIPANT_IDP_HOSTNAME']}:{config['PARTICIPANT_IDP_PORT_HTTPS']}"
-        f"/application/o/{config['AUTHENTIK_APP_SLUG']}/.well-known/openid-configuration"
-    )
-    
-    data = {
-        "participant_idp_well_known_url": participant_idp_well_known,
-        "participant_idp_consumer_key": consumer_key,
-        "participant_idp_consumer_secret": consumer_secret,
-        "authentik_app_slug": config['AUTHENTIK_APP_SLUG']
-    }
-    
-    filename = f"config-for-onboarding-{config['AUTHENTIK_APP_SLUG']}.json"
-    filepath = os.path.join(output_dir, filename)
-    
+def append_new_env_vars(filepath: str, variables: Dict[str, str]) -> None:
+    """Appends new keys and updates existing keys in a .env file without modifying other content."""
+
+    existing_lines = []
+    existing_keys = set()
+
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as f:
+            existing_lines = f.readlines()
+
+        for line in existing_lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#') and '=' in stripped:
+                existing_keys.add(stripped.split('=', 1)[0].strip())
+
+    # Update existing keys in place
+    new_lines = []
+    updated_keys = set()
+
+    for line in existing_lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#') and '=' in stripped:
+            key = stripped.split('=', 1)[0].strip()
+            if key in variables:
+                new_lines.append(f"{key}={variables[key]}\n")
+                updated_keys.add(key)
+                print(f" Updated: {key}={variables[key]}")
+                continue
+        new_lines.append(line)
+
+    # Write back updated lines
     with open(filepath, 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    print(f"Generated onboarding configuration: {filepath}")
+        f.writelines(new_lines)
+
+    # Append keys that were not already in the file
+    new_vars = {k: v for k, v in variables.items() if k not in updated_keys}
+
+    if new_vars:
+        with open(filepath, 'a') as f:
+            f.write("\n")
+            for key, value in new_vars.items():
+                f.write(f"{key}={value}\n")
+                print(f"  + Appended: {key}={value}")
+
+    print(f" Updated: {filepath}")
 
 def update_env_file(filepath: str, variables: Dict[str, str], preserve_vars: List[str] = None) -> None:
     if preserve_vars is None:
@@ -336,17 +357,8 @@ def main():
         f"https://{config['PARTICIPANT_IDP_HOSTNAME']}:{config['PARTICIPANT_IDP_PORT_HTTPS']}"
         f"/application/o/{config['AUTHENTIK_APP_SLUG']}/.well-known/openid-configuration"
     )
-    # TODO: please fix in a different script in issue #19
-    # consumer_key = f"generated_by_blueprint_{config['AUTHENTIK_APP_SLUG']}"
-    # consumer_secret = f"generated_by_blueprint_{config['AUTHENTIK_APP_SLUG']}"
-    # print("Derived values generated")
-    # print()
     
-    # print("Step 4: Generating onboarding configuration...")
-    # generate_onboarding_json(config, consumer_key, consumer_secret, script_dir)
-    # print()
-    
-    print("Step 5: Generating/updating environment files...")
+    print("Step 4: Generating/updating environment files...")
     print()
     
     print("  Processing .env.authentik...")
@@ -416,7 +428,6 @@ def main():
     
     authentik_defaults = {
         "AUTHENTIK_IMAGE": DEFAULTS_PARTICIPANT["AUTHENTIK_IMAGE"],
-        "AUTHENTIK_TAG": DEFAULTS_PARTICIPANT["AUTHENTIK_TAG"],
         "AUTHENTIK_PORT_HTTP": DEFAULTS_PARTICIPANT["AUTHENTIK_PORT_HTTP"],
         "AUTHENTIK_PORT_HTTPS": DEFAULTS_PARTICIPANT["AUTHENTIK_PORT_HTTPS"],
         "AUTHENTIK_POSTGRESQL__NAME": DEFAULTS_PARTICIPANT["AUTHENTIK_POSTGRESQL__NAME"],
@@ -512,7 +523,6 @@ def main():
         "OPENBAO_PORT": DEFAULTS_PARTICIPANT["OPENBAO_PORT"],
         "PORT": DEFAULTS_PARTICIPANT["PORT"],
         "SIGNER_MODE": DEFAULTS_PARTICIPANT["SIGNER_MODE"],
-        "SIGNER_SERVER_TAG": DEFAULTS_PARTICIPANT["SIGNER_SERVER_TAG"],
         "VAULT_URL": DEFAULTS_PARTICIPANT["VAULT_URL"],
         "VAULT_ETHEREUM_MOUNT": DEFAULTS_PARTICIPANT["VAULT_ETHEREUM_MOUNT"],
         "VAULT_KV_STORE_PATH": DEFAULTS_PARTICIPANT["VAULT_KV_STORE_PATH"],
@@ -528,7 +538,7 @@ def main():
         ]}),
         ("Generated", {"UPSTREAM_IDP": signer_vars["UPSTREAM_IDP"], "HTTP_CERT_PATH": signer_vars["HTTP_CERT_PATH"], "HTTP_KEY_PATH": signer_vars["HTTP_KEY_PATH"]}),
         ("Default", {k: signer_vars[k] for k in [
-            "OPENBAO_PORT", "SIGNER_MODE", "SIGNER_SERVER_TAG", "PORT",
+            "OPENBAO_PORT", "SIGNER_MODE", "PORT",
             "VAULT_URL", "VAULT_ETHEREUM_MOUNT", "VAULT_KV_STORE_PATH",
             "VAULT_TIMEOUT_MS"
         ]}),
@@ -553,7 +563,6 @@ def main():
     print("  Processing .env.wallet-api...")
     wallet_api_vars = {
         "SERVICE_HOST": DEFAULTS_PARTICIPANT["SERVICE_HOST"],
-        "WALLET_API_TAG": DEFAULTS_PARTICIPANT["WALLET_API_TAG"],
         "WALLET_BACKEND_PORT": DEFAULTS_PARTICIPANT["WALLET_BACKEND_PORT"],
         "DB_NAME": DEFAULTS_PARTICIPANT["DB_NAME"],
         "DB_USERNAME": DEFAULTS_PARTICIPANT["DB_USERNAME"],
@@ -598,7 +607,6 @@ def main():
         "NUXT_PUBLIC_REDIRECT_URI": f"{config['WALLET_UI_URL']}/auth/callback",
         "NUXT_PUBLIC_ISSUER_CALLBACK_URL": config['WALLET_UI_URL'],
         "NUXT_PUBLIC_DEV_WALLET_URL": config['WALLET_UI_URL'],
-        "DEV_WALLET_TAG": DEFAULTS_PARTICIPANT["DEV_WALLET_TAG"],
         "SERVICE_HOST": DEFAULTS_PARTICIPANT["SERVICE_HOST"],
         "DATABASE_ENGINE": DEFAULTS_PARTICIPANT["DATABASE_ENGINE"],
         "NUXT_WALLET_API_INTERNAL": DEFAULTS_PARTICIPANT["NUXT_WALLET_API_INTERNAL"],
@@ -617,7 +625,7 @@ def main():
             "WALLET_UI_HOST",
         ]}),
         ("Default", {k: wallet_ui_vars[k] for k in [
-            "SERVICE_HOST", "DEV_WALLET_TAG", "DATABASE_ENGINE", "NUXT_WALLET_API_INTERNAL"
+            "SERVICE_HOST", "DATABASE_ENGINE", "NUXT_WALLET_API_INTERNAL"
         ]}),
     ]
     ensure_env_file_structure(
@@ -628,28 +636,14 @@ def main():
 
     print("  Processing .env for root docker compose deployment...")
     env_vars = {
-        "WALLET_API_TAG": DEFAULTS_PARTICIPANT["WALLET_API_TAG"],
-        "DEV_WALLET_TAG": DEFAULTS_PARTICIPANT["DEV_WALLET_TAG"],
-        "SERVICE_HOST": DEFAULTS_PARTICIPANT["SERVICE_HOST"],
-        "AUTHENTIK_TAG": DEFAULTS_PARTICIPANT["AUTHENTIK_TAG"],
-        "SIGNER_SERVER_TAG": DEFAULTS_PARTICIPANT["SIGNER_SERVER_TAG"],
-        "WALLET_BACKEND_PORT": DEFAULTS_PARTICIPANT["WALLET_BACKEND_PORT"],
-        "NITRO_PORT": DEFAULTS_PARTICIPANT["NITRO_PORT"],
-        "PORT": DEFAULTS_PARTICIPANT["NITRO_PORT"],
-        "HOST": DEFAULTS_PARTICIPANT["HOST"],
-        "NITRO_HOST": DEFAULTS_PARTICIPANT["HOST"],
         "WALLET_API_HOST": urlparse(config["WALLET_API_URL"]).hostname,
         "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
     }
-    env_sections = [
-        ("Env Configuration", env_vars),
-    ]
-    ensure_env_file_structure(
-        os.path.join(script_dir, ".env"),
-        "PARTICIPANT — .env",
-        env_sections
+
+    append_new_env_vars(
+        os.path.join(script_dir, "docker-compose", ".env"),
+        env_vars,
     )
-    
     
     print()
     print("=" * 80)

@@ -4,6 +4,19 @@ metadata:
   labels:
     blueprints.goauthentik.io/generated: 'false'
 entries:
+  - model: authentik_crypto.certificatekeypair
+    identifiers:
+      name: vm1-test.oceanenterprise.io
+    state: present
+  - model: authentik_brands.brand
+    identifiers:
+      domain: authentik-default
+    attrs:
+      web_certificate: !Find [authentik_crypto.certificatekeypair, [name,
+        vm1-test.oceanenterprise.io]]
+      client_certificates:
+        - !Find [authentik_crypto.certificatekeypair, [name, vm1-test.oceanenterprise.io]]
+    state: present
   - model: authentik_flows.flow
     identifiers:
       slug: oe-app-auth-flow
@@ -175,6 +188,66 @@ entries:
       initial_value: ''
       initial_value_expression: false
       order: 100
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: default-source-enrollment-field-username
+    attrs:
+      field_key: username
+      label: Username
+      type: text
+      required: true
+      order: 101
+      placeholder: Username
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: default-user-settings-field-name
+    attrs:
+      field_key: name
+      label: Name
+      type: text
+      required: true
+      order: 200
+      placeholder: Full name
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: initial-setup-field-password
+    attrs:
+      field_key: password
+      label: Password
+      type: password
+      required: true
+      order: 300
+      placeholder: Password
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: initial-setup-field-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: Password (repeat)
+      type: password
+      required: true
+      order: 301
+      placeholder: Password (repeat)
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
     state: present
   - model: authentik_stages_prompt.prompt
     identifiers:
@@ -619,17 +692,4 @@ entries:
       meta_icon: ''
       meta_launch_url: ''
       open_in_new_tab: false
-    state: present
-  - model: authentik_crypto.certificatekeypair
-    identifiers:
-      name: vm1-test.oceanenterprise.io
-    state: present
-  - model: authentik_brands.brand
-    identifiers:
-      domain: authentik-default
-    attrs:
-      web_certificate: !Find [authentik_crypto.certificatekeypair, [name,
-        vm1-test.oceanenterprise.io]]
-      client_certificates:
-        - !Find [authentik_crypto.certificatekeypair, [name, vm1-test.oceanenterprise.io]]
     state: present
