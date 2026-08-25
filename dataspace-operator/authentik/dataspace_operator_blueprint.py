@@ -13,6 +13,7 @@ Generates a complete blueprint YAML file for the main authentik instance with:
 - Email notification to admin when duplicate email is detected
 - SMTP config from .env or fallback to defaults
 - Web certificate discovery and brand update
+- Generates .env.market file with OIDC configuration for marketplace
 """
 
 import os
@@ -256,6 +257,63 @@ def save_credentials_to_env(client_id: str, client_secret: str, base_url: str, a
         print(f"Could not save credentials to .env: {e}")
         return False
 
+
+def save_marketplace_env(
+    client_id: str, 
+    client_secret: str, 
+    central_idp_hostname: str, 
+    central_idp_port_https: str, 
+    app_slug: str, 
+    marketplace_url: str,
+    env_file: str = ".env.market"
+):
+    """
+    Save marketplace OIDC configuration to .env.market file.
+    
+    Generates the following variables:
+    - NEXT_PUBLIC_AUTH_ENABLED=true
+    - NEXT_PUBLIC_AUTH_PROVIDER=oidc
+    - NEXT_PUBLIC_OIDC_ISSUER=https://{hostname}:{port}/application/o/{app_slug}/
+    - NEXT_PUBLIC_OIDC_CLIENT_ID={client_id}
+    - OIDC_CLIENT_SECRET={client_secret}
+    - NEXT_PUBLIC_OIDC_REDIRECT_URI={marketplace_url}/auth/callback
+    - NEXT_PUBLIC_OIDC_TOKEN_URL=https://{hostname}:{port}/application/o/token/
+    - NEXT_PUBLIC_CENTRAL_IDP_NAME={app_slug}
+    """
+    try:
+        base_url = f"https://{central_idp_hostname}:{central_idp_port_https}"
+        issuer_url = f"{base_url}/application/o/{app_slug}/"
+        token_url = f"{base_url}/application/o/token/"
+        redirect_uri = f"{marketplace_url}/auth/callback"
+        
+        env_vars = {
+            "NEXT_PUBLIC_AUTH_ENABLED": "true",
+            "NEXT_PUBLIC_AUTH_PROVIDER": "oidc",
+            "NEXT_PUBLIC_OIDC_ISSUER": issuer_url,
+            "NEXT_PUBLIC_OIDC_CLIENT_ID": client_id,
+            "OIDC_CLIENT_SECRET": client_secret,
+            "NEXT_PUBLIC_OIDC_REDIRECT_URI": redirect_uri,
+            "NEXT_PUBLIC_OIDC_TOKEN_URL": token_url,
+            "NEXT_PUBLIC_CENTRAL_IDP_NAME": app_slug
+        }
+        
+        with open(env_file, 'w') as f:
+            f.write("# MARKET-LEVEL AUTHENTICATION USING AUTHENTIK SERVER\n")
+            for var_name, var_value in env_vars.items():
+                f.write(f"{var_name}={var_value}\n")
+        
+        print(f"\nMarketplace OIDC configuration saved to {env_file}")
+        print(f"   Issuer: {issuer_url}")
+        print(f"   Token URL: {token_url}")
+        print(f"   Redirect URI: {redirect_uri}")
+        print(f"   Client ID: {client_id}")
+        print(f"   Central IDP Name: {app_slug}")
+        return True
+    except Exception as e:
+        print(f"Could not save marketplace environment file: {e}")
+        return False
+
+
 def sanitize_url(url: str) -> str:
     url = url.strip()
     url = re.sub(r'^https?://+', 'https://', url)
@@ -329,6 +387,15 @@ def generate_blueprint(
     client_secret = generate_random_client_secret()
     
     save_credentials_to_env(client_id, client_secret, base_url, app_slug, redirect_uris, logout_uri)
+    
+    save_marketplace_env(
+        client_id=client_id,
+        client_secret=client_secret,
+        central_idp_hostname=central_idp_hostname,
+        central_idp_port_https=central_idp_port_https,
+        app_slug=app_slug,
+        marketplace_url=marketplace_url
+    )
     
     blueprint = {
         "version": 1,
