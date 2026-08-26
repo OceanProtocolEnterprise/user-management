@@ -476,7 +476,6 @@ def main():
     signer_vars = {
         "ALLOWED_ORIGINS": allowed_origins_json,
         "AUTHENTIK_AUDIENCE": config['CENTRAL_IDP_CLIENT_ID'],
-        "AUTHENTIK_CLIENT_SECRET": quote_password(config['CENTRAL_IDP_CLIENT_SECRET']),
         "AUTHENTIK_JWKS_URI": jwks_uri,
         "AUTHENTIK_ISSUER": issuer,
         "UPSTREAM_IDP": config['AUTHENTIK_APP_SLUG'],
@@ -494,7 +493,7 @@ def main():
     signer_sections = [
         ("Configurable (sourced from .env.config)", {k: signer_vars[k] for k in [
             "ALLOWED_ORIGINS", "AUTHENTIK_AUDIENCE", 
-            "AUTHENTIK_CLIENT_SECRET", "AUTHENTIK_JWKS_URI", "AUTHENTIK_ISSUER"
+            "AUTHENTIK_JWKS_URI", "AUTHENTIK_ISSUER"
         ]}),
         ("Generated", {"UPSTREAM_IDP": signer_vars["UPSTREAM_IDP"], "HTTP_CERT_PATH": signer_vars["HTTP_CERT_PATH"], "HTTP_KEY_PATH": signer_vars["HTTP_KEY_PATH"]}),
         ("Default", {k: signer_vars[k] for k in [
