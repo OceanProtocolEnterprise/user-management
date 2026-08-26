@@ -1,27 +1,76 @@
 # User Management
 
-The **User Management** repository provides the deployment and configuration components required to provision and manage the services used by **Dataspace Operators** and **Participants** in the Ocean Enterprise Marketplace ecosystem.
+User Management provides the deployment and configuration tooling required to provision services for **Dataspace Operators** and **Participants** in the Ocean Enterprise Marketplace ecosystem.
 
-The repository is organized into two major modules:
+The repository contains two independent deployment modules:
 
-* [`dataspace-operator/`](./dataspace-operator) — deployment and configuration for a Dataspace Operator.
-* [`participant/`](./participant) — deployment and configuration for a Participant.
+- [Dataspace Operator](./dataspace-operator/README.md)
+- [Participant](./participant/README.md)
 
-Both modules follow a similar deployment architecture and provide the infrastructure and supporting services required for authentication, secrets management, databases, signing, networking, and wallet-related functionality.
+Each module provides a complete Docker Compose based deployment stack with authentication, secrets management, database, signing, networking, and wallet services.
 
 ---
 
-## Repository Overview
+## Motivation
+
+The Ocean Enterprise Marketplace requires both Dataspace Operators and Participants to have a consistent set of supporting services for identity, authentication, secrets, signing, networking, and wallet management.
+
+This repository centralizes the deployment configuration and initialization logic required to provision those services.
+
+The goal is to make deployments:
+
+- reproducible;
+- configurable through a small set of input files;
+- easy to initialize on a fresh host;
+- consistent between Dataspace Operator and Participant deployments;
+- secure by keeping generated credentials and secrets out of the source configuration.
+
+---
+
+## Scope
+
+User Management is responsible for deploying and configuring the supporting services required by Dataspace Operators and Participants.
+
+The repository contains two deployment stacks:
+
+```mermaid
+flowchart TD
+    UM["User Management"]
+
+    UM --> DO["Dataspace Operator"]
+    UM --> P["Participant"]
+
+    DO --> DA["Authentik"]
+    DO --> DOBAO["OpenBao"]
+    DO --> DODB["PostgreSQL"]
+    DO --> DOS["Signer Server"]
+    DO --> DOT["Traefik"]
+    DO --> DOWA["Wallet API"]
+    DO --> DOWU["Wallet UI"]
+
+    P --> PA["Authentik"]
+    P --> POBAO["OpenBao"]
+    P --> PDB["PostgreSQL"]
+    P --> PS["Signer Server"]
+    P --> PT["Traefik"]
+    P --> PWA["Wallet API"]
+    P --> PWU["Wallet UI"]
+```
+
+The Dataspace Operator and Participant deployments share common infrastructure components, but each has role-specific configuration and Authentik blueprints.
+
+---
+
+## Repository Structure
+
+The repository is organized as follows:
 
 ```text
 user-management/
-│
 ├── dataspace-operator/
 │   ├── authentik/
 │   ├── docker-compose/
-│   ├── .gitignore
 │   ├── .env
-│   ├── docker-compose.yml
 │   ├── .env.config
 │   ├── dataspace_operator_environment_configuration.py
 │   ├── dataspace-operator-initial-setup.sh
@@ -31,7 +80,6 @@ user-management/
 │   ├── authentik/
 │   ├── docker-compose/
 │   ├── .env
-│   ├── docker-compose.yml
 │   ├── .env.config
 │   ├── participant_environment_configuration.py
 │   ├── participant-initial-setup.sh
@@ -41,454 +89,281 @@ user-management/
 └── README.md
 ```
 
-The `docker-compose/` directory in each module contains the service-specific deployment configuration, while the module-level environment and setup files control how the complete deployment is configured.
+The service-specific `.env` files are **generated during the initial setup** and therefore are intentionally not shown in the source directory structure above.
 
 ---
 
-# Architecture
+# Prerequisites
 
-The repository contains two independent deployment stacks.
+Before starting a deployment, make sure the host satisfies the following requirements.
 
-```text
-                    Ocean Enterprise Marketplace
-                              │
-              ┌───────────────┴───────────────┐
-              │                               │
-              ▼                               ▼
-     Dataspace Operator                  Participant
-              │                               │
-              │                               │
-       ┌──────┴──────┐                 ┌──────┴──────┐
-       │             │                 │             │
-       ▼             ▼                 ▼             ▼
-   Authentik     Supporting        Authentik     Supporting
-                 Services                        Services
-       │                               │
-       ├── OpenBao                     ├── OpenBao
-       ├── PostgreSQL                  ├── PostgreSQL
-       ├── Signer Server               ├── Signer Server
-       ├── Traefik                     ├── Traefik
-       ├── Wallet API                  ├── Wallet API
-       └── Wallet UI                   └── Wallet UI
+## Operating System
+
+The initial setup scripts are intended to run on Unix-based systems.
+
+Supported distributions include:
+
+- Fedora
+- Alpine Linux
+- openSUSE
+- CentOS
+
+The setup scripts rely on standard Unix shell utilities and Docker tooling.
+
+## Required Software
+
+Install the latest stable versions of:
+
+- Git
+- Docker
+- Docker Compose
+
+Docker Compose should be available through the `docker compose` command.
+
+Verify the installation:
+
+```bash
+docker --version
+docker compose version
+git --version
 ```
 
-The exact services and their configuration are defined by the Docker Compose files inside each module.
+Python is also required for the environment configuration scripts. The Python dependencies for each deployment are listed in the corresponding `requirements.txt`.
 
 ---
 
-# Dataspace Operator
+# Configuration
 
-The `dataspace-operator` module is responsible for deploying the services required for a Dataspace Operator.
-
-It contains:
-
-* Authentik configuration and blueprints
-* OpenBao for secrets management
-* PostgreSQL initialization for Authentik
-* Signer Server
-* Traefik reverse proxy and TLS configuration
-* Wallet API
-* Wallet UI
-* Operator-specific environment configuration
-* Operator initial setup scripts
-
-For detailed instructions, see:
-
-**[Dataspace Operator README](./dataspace-operator/README.md)**
-
----
-
-# Participant
-
-The `participant` module provides the corresponding deployment stack for a Participant.
-
-It contains:
-
-* Authentik configuration and participant blueprints
-* OpenBao for secrets management
-* PostgreSQL initialization for Authentik
-* Signer Server
-* Traefik reverse proxy and TLS configuration
-* Wallet API
-* Wallet UI
-* Participant-specific environment configuration
-* Participant initial setup scripts
-
-For detailed instructions, see:
-
-**[Participant README](./participant/README.md)**
-
----
-
-# Common Services
-
-Both deployments contain a number of common infrastructure components.
-
-## Authentik
-
-Authentik provides the identity and authentication layer.
-
-The repository contains custom Authentik blueprints for the different deployment types.
-
-For example:
-
-```text
-dataspace-operator/
-└── authentik/
-    └── dataspace_operator_blueprint.py
-```
-
-and:
-
-```text
-participant/
-└── authentik/
-    └── participant_blueprint.py
-```
-
-The Docker Compose deployment also contains the corresponding Authentik blueprint YAML files.
-
----
-
-## OpenBao
-
-OpenBao is used as the secrets-management component.
-
-It is responsible for securely storing and managing sensitive configuration and credentials required by the deployment.
-
-The OpenBao deployment contains:
-
-* OpenBao configuration
-* Initialization scripts
-* Account-management scripts
-* Secret storage
-* Private keys
-* Environment configuration
-
-Sensitive files should never be committed to source control.
-
----
-
-## PostgreSQL
-
-PostgreSQL is used as the database backend for services that require persistent database storage.
-
-The repository contains initialization scripts specifically for creating the Authentik database.
-
-Example:
-
-```text
-postgres-init/
-├── .env.postgres
-└── create-authentik-db.sh
-```
-
----
-
-## Signer Server
-
-The Signer Server provides signing-related functionality required by the deployed ecosystem components.
-
-Its deployment includes:
-
-```text
-signer-server/
-├── certs/
-└── .env.signer-server
-```
-
----
-
-## Traefik
-
-Traefik acts as the reverse proxy and TLS entry point for the deployment.
-
-Its configuration contains:
-
-```text
-traefik/
-├── certs/
-├── dynamic/
-└── .env.traefik
-```
-
-TLS certificates and keys should be handled securely and should not be committed to Git unless they are explicitly intended to be public/test certificates.
-
----
-
-## Wallet API and Wallet UI
-
-The deployment includes both backend and frontend components for wallet functionality.
-
-```text
-wallet-api/
-├── config/
-├── data/
-└── .env.wallet-api
-
-wallet-ui/
-├── .env.wallet-ui
-└── .gitkeep
-```
-
-The Wallet API provides the backend functionality, while the Wallet UI provides the user-facing interface.
-
----
-
-# Configuration Model
-
-Configuration is separated between deployment-level configuration and service-specific configuration.
-
-Typical configuration files include:
+Each deployment has two main configuration files:
 
 ```text
 .env
 .env.config
 ```
 
-and service-specific files such as:
+These files have different purposes.
+
+## `.env`
+
+The `.env` file contains the **Docker image tags/versions** used by the deployment.
+
+It is used to control which versions of the required container images are deployed.
+
+Example:
 
 ```text
-.env.authentik
-.env.openbao
-.env.postgres
-.env.signer-server
-.env.traefik
-.env.wallet-api
-.env.wallet-ui
+SERVICE_IMAGE_TAG=...
 ```
 
-The exact variables required by each deployment are defined by the corresponding Compose files and initialization scripts.
+The exact variables depend on the deployment.
 
-**Do not copy secrets directly into committed `.env` files unless the repository is explicitly designed for that purpose.**
+## `.env.config`
 
-For production deployments, sensitive values such as:
+The `.env.config` file contains the deployment configuration used by the environment configuration script.
 
-* passwords
-* private keys
-* signing keys
-* tokens
-* database credentials
-* secret-management credentials
-* TLS private keys
+It is used to generate the `.env` files required by individual services.
 
-must be protected appropriately.
+The configuration flow is:
+
+```text
+.env
+   │
+   └── Image tags / versions
+
+.env.config
+   │
+   └── Deployment configuration
+             │
+             ▼
+environment configuration script
+             │
+             ▼
+generated service-specific .env files
+```
+
+Users should configure the input files rather than manually editing generated service-specific `.env` files.
 
 ---
 
-# Initial Setup
+# Generated `.env` Files
 
-Each module provides an initial setup script.
+The initial setup script generates service-specific environment files from `.env.config`.
 
-For Dataspace Operator:
+Depending on the deployment, generated files include:
 
-```bash
-cd dataspace-operator
-./dataspace-operator-initial-setup.sh
+```text
+docker-compose/authentik/.env.authentik
+docker-compose/openbao/.env.openbao
+docker-compose/postgres-init/.env.postgres
+docker-compose/signer-server/.env.signer-server
+docker-compose/traefik/.env.traefik
+docker-compose/wallet-api/.env.wallet-api
+docker-compose/wallet-ui/.env.wallet-ui
 ```
 
-For Participant:
+These files should be considered **generated artifacts**.
 
-```bash
-cd participant
-./participant-initial-setup.sh
-```
+Do not manually configure them unless you are debugging or developing the deployment tooling.
 
-These scripts should be treated as the primary entry point for preparing a fresh deployment.
-
-Before running an initial setup script, review the corresponding module README and configuration files.
+If a generated value needs to change, update the appropriate source configuration and run the setup/configuration process again.
 
 ---
 
-# Running the Deployment
+# Deployment Workflow
 
-After configuration and initial setup, the Docker Compose stack can be started from the corresponding module directory.
+Both deployment modules follow the same general workflow:
 
-For example:
+```mermaid
+sequenceDiagram
+    actor User
+    participant Repo as User Management Repository
+    participant Config as Environment Configuration
+    participant Setup as Initial Setup Script
+    participant Docker as Docker Compose
+    participant Services as Deployment Services
 
-```bash
-cd dataspace-operator
-docker compose up -d
+    User->>Repo: Clone repository
+    User->>Repo: Select deployment module
+    User->>Config: Configure .env and .env.config
+    User->>Setup: Run initial setup script
+    Setup->>Config: Read deployment configuration
+    Config->>Setup: Generate service-specific .env files
+    Setup->>Docker: Prepare deployment
+    User->>Docker: docker compose up -d
+    Docker->>Services: Start containers
+    Services-->>User: Deployment available
 ```
 
-or:
+For deployment-specific instructions, use:
 
-```bash
-cd participant
-docker compose up -d
-```
-
-Check the module-specific README for any required initialization or ordering steps before starting the complete stack.
+- [Dataspace Operator deployment](./dataspace-operator/README.md)
+- [Participant deployment](./participant/README.md)
 
 ---
 
-# Stopping the Deployment
+# Dataspace Operator
 
-To stop a deployment:
+The Dataspace Operator module provisions the services required by a Dataspace Operator.
 
-```bash
-docker compose down
+It includes:
+
+- Authentik
+- OpenBao
+- PostgreSQL
+- Signer Server
+- Traefik
+- Wallet API
+- Wallet UI
+- Operator-specific environment configuration
+- Participant onboarding tooling
+
+See the [Dataspace Operator README](./dataspace-operator/README.md) for configuration and deployment instructions.
+
+---
+
+# Participant
+
+The Participant module provisions the services required by a Participant.
+
+It includes:
+
+- Authentik
+- OpenBao
+- PostgreSQL
+- Signer Server
+- Traefik
+- Wallet API
+- Wallet UI
+- Participant-specific environment configuration
+
+See the [Participant README](./participant/README.md) for configuration and deployment instructions.
+
+---
+
+# Security
+
+The deployment handles authentication credentials, secrets, certificates, private keys, and other security-sensitive configuration.
+
+Never commit production secrets or private keys to the repository.
+
+In particular, treat the following as sensitive:
+
+```text
+.env.config
+certs/
+secrets/
+private_keys/
+generated .env files
 ```
 
-Run this command from the relevant module directory.
+Before using a deployment in production:
 
-To inspect the status of the services:
+- use production credentials;
+- use valid production TLS certificates;
+- protect private keys;
+- restrict access to OpenBao;
+- review exposed ports and Traefik routes;
+- secure persistent Docker volumes;
+- ensure generated environment files are not committed.
+
+---
+
+# Troubleshooting
+
+Check the status of the deployment:
 
 ```bash
 docker compose ps
 ```
 
-To inspect service logs:
+View service logs:
 
 ```bash
 docker compose logs
 ```
 
-For a specific service:
+Follow the logs of a specific service:
 
 ```bash
-docker compose logs <service-name>
+docker compose logs -f <service-name>
 ```
 
----
+If a deployment fails during initialization, check:
 
-# Security Considerations
+1. `.env`
+2. `.env.config`
+3. generated service-specific `.env` files
+4. certificates
+5. Docker availability
+6. required ports
+7. service logs
 
-This repository deploys infrastructure that handles identities, credentials, secrets, private keys, and authentication.
-
-Before using it in a production environment:
-
-1. Replace all development/test credentials.
-2. Use production TLS certificates.
-3. Protect all private keys.
-4. Review all `.env` files.
-5. Do not commit secrets to Git.
-6. Restrict access to OpenBao.
-7. Use appropriate database credentials.
-8. Review exposed ports and network access.
-9. Review Traefik routing and TLS configuration.
-10. Ensure persistent volumes and backups are secured.
+For deployment-specific troubleshooting, refer to the corresponding module README.
 
 ---
 
-# Development vs Production
+# Related Documentation
 
-The repository structure supports deployment configuration, but production readiness depends on the values supplied to the configuration files and environment variables.
-
-A development deployment may use:
-
-* local hostnames
-* test certificates
-* development credentials
-* local Docker volumes
-* locally accessible services
-
-A production deployment should use:
-
-* production DNS names
-* trusted TLS certificates
-* strong credentials
-* securely managed secrets
-* persistent and backed-up storage
-* restricted network access
+- [Dataspace Operator README](./dataspace-operator/README.md)
+- [Participant README](./participant/README.md)
 
 ---
 
-# Requirements
+# Contributing
 
-The deployment requires the tools used by the setup and Compose configuration.
+Changes to deployment configuration, initialization scripts, or service definitions should be reviewed carefully because they can affect both fresh installations and existing deployments.
 
-At minimum, ensure that the host has:
+When modifying the deployment:
 
-* Docker
-* Docker Compose
-* Git
-* Bash
-* Python, where required by the environment configuration scripts
-
-Python dependencies are documented in the respective:
-
-```text
-requirements.txt
-```
-
-files.
+1. Update the relevant configuration or setup script.
+2. Test the initial setup on a clean environment.
+3. Verify that generated `.env` files contain the expected values.
+4. Start the Docker Compose deployment.
+5. Verify the health and connectivity of the affected services.
+6. Update the relevant README when deployment behavior changes.
 
 ---
 
-# Repository Structure
+# Project Status
 
-## Dataspace Operator
-
-```text
-dataspace-operator/
-├── authentik/
-│   └── dataspace_operator_blueprint.py
-│
-├── docker-compose/
-│   ├── authentik/
-│   │   ├── blueprints/
-│   │   ├── certs/
-│   │   ├── participant-configs/
-│   │   └── scripts/
-│   │
-│   ├── openbao/
-│   ├── postgres-init/
-│   ├── signer-server/
-│   ├── traefik/
-│   └── wallet-api/
-│
-├── wallet-ui/
-├── .env
-├── docker-compose.yml
-├── .env.config
-├── dataspace_operator_environment_configuration.py
-├── dataspace-operator-initial-setup.sh
-└── requirements.txt
-```
-
-## Participant
-
-```text
-participant/
-├── authentik/
-│   └── participant_blueprint.py
-│
-├── docker-compose/
-│   ├── authentik/
-│   │   ├── blueprints/
-│   │   └── certs/
-│   │
-│   ├── openbao/
-│   ├── postgres-init/
-│   ├── signer-server/
-│   ├── traefik/
-│   └── wallet-api/
-│
-├── wallet-ui/
-├── .env
-├── docker-compose.yml
-├── .env.config
-├── participant_environment_configuration.py
-├── participant-initial-setup.sh
-└── requirements.txt
-```
-
----
-
-# Choosing a Deployment
-
-Use the **Dataspace Operator** deployment when provisioning infrastructure for an entity acting as the Dataspace Operator.
-
-Use the **Participant** deployment when provisioning infrastructure for an entity participating in the dataspace.
-
-Each module is independently configurable and deployable.
-
----
-
-# Further Documentation
-
-Detailed deployment instructions are available in:
-
-* [Dataspace Operator](./dataspace-operator/README.md)
-* [Participant](./participant/README.md)
+User Management is used to provision Dataspace Operator and Participant service deployments for the Ocean Enterprise Marketplace ecosystem.

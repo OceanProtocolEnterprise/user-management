@@ -1,60 +1,117 @@
 # Dataspace Operator
 
-The `dataspace-operator` module contains everything required to configure and deploy the services associated with a **Dataspace Operator** in the Ocean Enterprise Marketplace ecosystem.
+The `dataspace-operator` module provides the deployment and configuration tooling required to provision a **Dataspace Operator** for the Ocean Enterprise Marketplace ecosystem.
 
-The deployment is based on Docker Compose and consists of identity management, secrets management, database, signing, reverse-proxy, and wallet-related services.
+The deployment is based on Docker Compose and includes authentication, secrets management, database, signing, reverse proxy, and wallet services.
 
 ---
 
-# Overview
+## Contents
 
-The Dataspace Operator deployment provides the following major components:
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [Directory Structure](#directory-structure)
+- [Configuration](#configuration)
+- [Generated `.env` Files](#generated-env-files)
+- [Marketplace Configuration](#marketplace-configuration)
+- [Initial Setup](#initial-setup)
+- [Starting the Deployment](#starting-the-deployment)
+- [Onboarding a Participant](#onboarding-a-participant)
+- [Federation and Social Login Source Onboarding](#federation-and-social-login-source-onboarding)
+- [Services](#services)
+- [Stopping the Deployment](#stopping-the-deployment)
+- [Updating the Deployment](#updating-the-deployment)
+- [Troubleshooting](#troubleshooting)
+- [Security](#security)
+- [Related Documentation](#related-documentation)
 
-| Component                 | Purpose                           |
-| ------------------------- | --------------------------------- |
-| Authentik                 | Identity and authentication       |
-| OpenBao                   | Secrets management                |
-| PostgreSQL                | Database backend                  |
-| Signer Server             | Signing functionality             |
-| Traefik                   | Reverse proxy and TLS termination |
-| Wallet API                | Wallet backend services           |
-| Wallet UI                 | Wallet frontend                   |
-| Environment Configuration | Operator-specific configuration   |
-| Initial Setup             | Automated deployment preparation  |
+---
 
-The complete deployment is orchestrated through:
+## Overview
+
+The Dataspace Operator deployment contains the following major components:
+
+| Component | Purpose |
+|---|---|
+| Authentik | Identity and authentication |
+| OpenBao | Secrets management |
+| PostgreSQL | Database backend |
+| Signer Server | Signing functionality |
+| Traefik | Reverse proxy and TLS |
+| Wallet API | Wallet backend |
+| Wallet UI | Wallet frontend |
+| Participant onboarding | Automated participant onboarding |
+| Federation / Social Login | Federation source configuration for participant identity providers |
+
+The deployment is orchestrated by:
 
 ```text
 docker-compose.yml
+````
+
+---
+
+## Prerequisites
+
+### Supported Operating Systems
+
+The initial setup script is intended to run on the following Unix distributions:
+
+* Fedora
+* Alpine Linux
+* openSUSE
+* CentOS
+
+### Required Software
+
+Install the latest stable versions of:
+
+* Git
+* Docker
+* Docker Compose
+* Python
+
+Verify the installation:
+
+```bash
+docker --version
+docker compose version
+git --version
+python3 --version
+```
+
+Install the Python dependencies:
+
+```bash
+pip install -r requirements.txt
 ```
 
 ---
 
-# Directory Structure
+## Directory Structure
+
+The repository contains source configuration and deployment files.
+
+Generated service-specific `.env` files are intentionally excluded from this tree because they are created by the initial setup process.
 
 ```text
 dataspace-operator/
-│
 ├── authentik/
 │   └── dataspace_operator_blueprint.py
 │
 ├── docker-compose/
-│   │
 │   ├── authentik/
 │   │   ├── blueprints/
 │   │   │   └── dataspace-operator-authentik-blueprint.yaml
 │   │   ├── certs/
 │   │   ├── participant-configs/
-│   │   ├── scripts/
-│   │   │   └── dataspace_operator_add_participant.py
-│   │   ├── .env.authentik
-│   │   └── onboard-participant.sh
+│   │   └── scripts/
+│   │       └── dataspace_operator_add_participant.py
 │   │
 │   ├── openbao/
 │   │   ├── certs/
 │   │   ├── secrets/
 │   │   ├── private_keys/
-│   │   ├── .env.openbao
 │   │   ├── Dockerfile
 │   │   ├── docker-entrypoint.sh
 │   │   ├── init-vault.sh
@@ -62,244 +119,67 @@ dataspace-operator/
 │   │   └── openbao.hcl
 │   │
 │   ├── postgres-init/
-│   │   ├── .env.postgres
 │   │   └── create-authentik-db.sh
 │   │
 │   ├── signer-server/
-│   │   ├── certs/
-│   │   └── .env.signer-server
+│   │   └── certs/
 │   │
 │   ├── traefik/
 │   │   ├── certs/
-│   │   ├── dynamic/
-│   │   └── .env.traefik
+│   │   └── dynamic/
 │   │
 │   └── wallet-api/
 │       ├── config/
-│       ├── data/
-│       └── .env.wallet-api
+│       └── data/
 │
 ├── wallet-ui/
-│   ├── .env.wallet-ui
-│   └── .gitkeep
-│
 ├── .env
-├── docker-compose.yml
 ├── .env.config
+├── docker-compose.yml
 ├── dataspace_operator_environment_configuration.py
 ├── dataspace-operator-initial-setup.sh
 └── requirements.txt
 ```
 
----
+The `.env.*` files generated for individual services and the `.env.market` file are intentionally not shown in the source tree above.
 
-# Components
-
-## 1. Authentik
-
-Authentik provides the identity and authentication layer for the Dataspace Operator deployment.
-
-The repository contains a dedicated operator blueprint:
-
-```text
-authentik/
-└── dataspace_operator_blueprint.py
-```
-
-and the Docker Compose deployment contains the corresponding Authentik blueprint:
-
-```text
-docker-compose/authentik/blueprints/
-└── dataspace-operator-authentik-blueprint.yaml
-```
-
-The Authentik configuration also contains:
-
-```text
-docker-compose/authentik/
-├── certs/
-├── participant-configs/
-├── scripts/
-├── .env.authentik
-└── onboard-participant.sh
-```
-
-### Participant onboarding
-
-The operator deployment contains tooling for onboarding participants.
-
-For example:
-
-```text
-scripts/
-└── dataspace_operator_add_participant.py
-```
-
-and:
-
-```text
-onboard-participant.sh
-```
-
-These components are intended to support adding and configuring participants within the operator environment.
+They are generated as part of the deployment/configuration process.
 
 ---
 
-# 2. OpenBao
+## Configuration
 
-OpenBao is used as the secrets-management layer.
+The Dataspace Operator deployment uses two main input configuration files.
 
-The deployment contains:
+### `.env`
 
-```text
-openbao/
-├── certs/
-├── secrets/
-├── private_keys/
-├── .env.openbao
-├── Dockerfile
-├── docker-entrypoint.sh
-├── init-vault.sh
-├── manage-accounts.sh
-└── openbao.hcl
-```
+`.env` is used for **Docker image tags and versions**.
 
-The important responsibilities of this component include:
+It controls the versions of the container images used by the deployment.
 
-* Secret storage
-* Private-key management
-* OpenBao initialization
-* Account management
-* Secure communication using certificates
-* Loading the OpenBao server configuration
+Users should update image versions in this file when a different image release needs to be deployed.
 
-### Important
+### `.env.config`
 
-The following directories/files may contain sensitive material:
+`.env.config` contains the Dataspace Operator deployment configuration.
 
-```text
-secrets/
-private_keys/
-certs/
-.env.openbao
-```
-
-Do not commit production credentials or private keys to the repository.
-
----
-
-# 3. PostgreSQL
-
-PostgreSQL provides the database backend required by the deployment.
-
-The initialization configuration is located at:
-
-```text
-postgres-init/
-├── .env.postgres
-└── create-authentik-db.sh
-```
-
-The database initialization script is responsible for preparing the Authentik database.
-
-Before starting the complete deployment, ensure that the database configuration is correctly populated.
-
----
-
-# 4. Signer Server
-
-The Signer Server provides signing functionality required by the deployment.
-
-Configuration:
-
-```text
-signer-server/
-├── certs/
-└── .env.signer-server
-```
-
-The certificate configuration should be reviewed before deploying into a production environment.
-
----
-
-# 5. Traefik
-
-Traefik is used as the reverse proxy and TLS entry point.
-
-Configuration:
-
-```text
-traefik/
-├── certs/
-├── dynamic/
-└── .env.traefik
-```
-
-The `certs/` directory contains TLS-related material, while `dynamic/` contains dynamic Traefik configuration.
-
-Review:
-
-* Hostnames
-* Routing rules
-* TLS certificates
-* TLS private keys
-* Service endpoints
-* External/internal ports
-
-before deploying the stack.
-
----
-
-# 6. Wallet API
-
-The Wallet API is the backend component of the wallet functionality.
-
-Its configuration is located under:
-
-```text
-wallet-api/
-├── config/
-├── data/
-└── .env.wallet-api
-```
-
-The environment configuration should be reviewed and populated before starting the deployment.
-
----
-
-# 7. Wallet UI
-
-The Wallet UI provides the frontend interface for the wallet functionality.
-
-Configuration:
-
-```text
-wallet-ui/
-└── .env.wallet-ui
-```
-
-The UI configuration should be consistent with the URLs and endpoints exposed by the Wallet API and Traefik configuration.
-
----
-
-# Configuration
-
-The operator deployment has multiple configuration layers.
-
-## Main configuration
-
-```text
-.env
-.env.config
-```
-
-## Operator environment configuration
+It is consumed by:
 
 ```text
 dataspace_operator_environment_configuration.py
 ```
 
-## Service-specific configuration
+The configuration script uses `.env.config` to generate the environment files required by individual services.
+
+Users should configure `.env.config` rather than manually editing generated service `.env` files.
+
+---
+
+## Generated `.env` Files
+
+The initial setup/configuration process generates service-specific environment files.
+
+Depending on the deployment configuration, these include:
 
 ```text
 docker-compose/authentik/.env.authentik
@@ -308,45 +188,85 @@ docker-compose/postgres-init/.env.postgres
 docker-compose/signer-server/.env.signer-server
 docker-compose/traefik/.env.traefik
 docker-compose/wallet-api/.env.wallet-api
-wallet-ui/.env.wallet-ui
+docker-compose/wallet-ui/.env.wallet-ui
 ```
 
-The exact values required by each environment should be taken from the corresponding Compose configuration and setup scripts.
+These files are generated from the deployment configuration and should not normally be edited manually.
+
+If configuration needs to be changed:
+
+1. Update `.env` or `.env.config`.
+2. Run the environment configuration/setup process.
+3. Verify the generated files.
+4. Start or restart the deployment.
 
 ---
 
-# Configuration Checklist
+## Marketplace Configuration
 
-Before starting a fresh deployment, verify the following.
+The Dataspace Operator generates a dedicated marketplace configuration file:
 
-* [ ] Operator-specific environment values are configured.
-* [ ] `.env` is configured.
-* [ ] `.env.config` is configured.
-* [ ] Authentik configuration is populated.
-* [ ] Authentik certificates are available.
-* [ ] OpenBao configuration is populated.
-* [ ] OpenBao certificates are available.
-* [ ] OpenBao secrets and private keys are securely configured.
-* [ ] PostgreSQL credentials are configured.
-* [ ] Signer Server configuration is populated.
-* [ ] Signer Server certificates are available.
-* [ ] Traefik configuration is populated.
-* [ ] Traefik certificates are available.
-* [ ] Wallet API configuration is populated.
-* [ ] Wallet UI configuration is populated.
-* [ ] DNS/hostnames point to the deployment where required.
-* [ ] Required ports are available.
-* [ ] Docker and Docker Compose are installed.
+```text
+.env.market
+```
+
+This file is generated in the **root directory of the Dataspace Operator deployment**.
+
+The `.env.market` file is generated by:
+
+```text
+authentik/dataspace_operator_blueprint.py
+```
+
+### Purpose of `.env.market`
+
+`.env.market` contains the configuration required by the **Ocean Enterprise Marketplace** to configure its **Central Identity Provider (Central IdP)** for the Dataspace Operator.
+
+The generated file is intended to be shared with the Marketplace deployment/operator.
+
+The integration flow is:
+
+```text
+Dataspace Operator
+       |
+       | Run Authentik configuration
+       v
+dataspace_operator_blueprint.py
+       |
+       | generates
+       v
+.env.market
+       |
+       | shared with
+       v
+Ocean Enterprise Marketplace
+       |
+       | configures
+       v
+Marketplace Central IdP
+```
+
+### Important
+
+`.env.market` is a **generated file**.
+
+It should not be manually created or maintained as the primary source of configuration.
+
+If the Dataspace Operator configuration changes, regenerate the configuration and use the newly generated `.env.market` when configuring the Marketplace.
+
+The generated `.env.market` may contain configuration information required for integration with the Marketplace. Handle and share the file according to the deployment's security requirements.
 
 ---
 
-# Initial Setup
+## Initial Setup
 
-The repository provides an initial setup script:
+The Dataspace Operator deployment provides:
 
 ```text
 dataspace-operator-initial-setup.sh
 ```
+
+The initial setup prepares the environment and generates the service-specific configuration required by the Docker Compose deployment.
 
 Make the script executable if required:
 
@@ -354,27 +274,68 @@ Make the script executable if required:
 chmod +x dataspace-operator-initial-setup.sh
 ```
 
-Then run:
+Run the setup:
 
 ```bash
 ./dataspace-operator-initial-setup.sh
 ```
 
-The initial setup script should be considered the preferred mechanism for preparing a new Dataspace Operator deployment.
-
-Before executing it, review the script to understand which configuration files, directories, secrets, certificates, and services it initializes.
+The setup process should be executed before starting the Docker Compose stack on a new deployment.
 
 ---
 
-# Starting the Deployment
+## Deployment Flow
 
-After completing configuration and initial setup:
+The complete deployment flow is:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Config as .env.config
+    participant Script as Environment Configuration
+    participant Setup as Initial Setup
+    participant AuthBlueprint as Authentik Blueprint
+    participant Compose as Docker Compose
+    participant Services as Operator Services
+    participant Market as .env.market
+
+    User->>Config: Configure operator parameters
+    User->>Script: Run configuration/setup
+    Script->>Config: Read configuration
+    Config-->>Script: Return configuration
+    Script->>Script: Generate service .env files
+    Script-->>User: Configuration generated
+
+    User->>Setup: Run initial setup
+    Setup->>Compose: Prepare deployment
+
+    User->>Compose: docker compose up -d
+    Compose->>Services: Start Authentik
+    Compose->>Services: Start OpenBao
+    Compose->>Services: Start PostgreSQL
+    Compose->>Services: Start Signer Server
+    Compose->>Services: Start Traefik
+    Compose->>Services: Start Wallet API
+    Compose->>Services: Start Wallet UI
+
+    Services-->>User: Dataspace Operator deployment available
+
+    User->>AuthBlueprint: Run Authentik configuration
+    AuthBlueprint->>Market: Generate .env.market
+    Market-->>User: Marketplace configuration available
+```
+
+---
+
+## Starting the Deployment
+
+After completing the initial setup, start the deployment from the `dataspace-operator` directory:
 
 ```bash
 docker compose up -d
 ```
 
-Check the running containers:
+Check the status:
 
 ```bash
 docker compose ps
@@ -386,13 +347,13 @@ View logs:
 docker compose logs
 ```
 
-To follow logs:
+Follow all logs:
 
 ```bash
 docker compose logs -f
 ```
 
-To inspect a particular service:
+Follow a specific service:
 
 ```bash
 docker compose logs -f <service-name>
@@ -400,63 +361,321 @@ docker compose logs -f <service-name>
 
 ---
 
-# Stopping the Deployment
+## Onboarding a Participant
 
-To stop the deployment:
+The Dataspace Operator deployment provides automated tooling for onboarding Participants.
+
+Participant-specific configuration is handled under:
+
+```text
+docker-compose/authentik/participant-configs/
+```
+
+The onboarding functionality is implemented through the Authentik onboarding scripts.
+
+### When to onboard a Participant
+
+Participant onboarding should be performed **after the Dataspace Operator deployment has been initialized and its required services are running**.
+
+The operator should first be configured and started successfully before attempting to onboard a Participant.
+
+### Onboarding flow
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant Auth as Authentik
+    participant Script as Onboarding Script
+    participant Config as Participant Config
+    participant Participant as Participant
+
+    Operator->>Script: Start participant onboarding
+    Script->>Config: Read participant configuration
+    Config-->>Script: Participant parameters
+    Script->>Auth: Configure participant
+    Auth-->>Script: Participant configuration created
+    Script-->>Operator: Onboarding completed
+    Operator->>Participant: Verify participant connectivity
+```
+
+### Running the onboarding script
+
+From the Dataspace Operator directory, run:
+
+```bash
+./docker-compose/authentik/onboard-participant.sh
+```
+
+If the script provides command-line help, it can be checked with:
+
+```bash
+./docker-compose/authentik/onboard-participant.sh --help
+```
+
+The Python implementation can also be invoked directly when required:
+
+```bash
+python docker-compose/authentik/scripts/dataspace_operator_add_participant.py
+```
+
+The onboarding scripts should be preferred over manually modifying Authentik configuration.
+
+---
+
+## Federation and Social Login Source Onboarding
+
+The Dataspace Operator Authentik deployment supports onboarding a **federation source / social login source** for a Participant.
+
+This process creates the federation source inside the running Authentik instance using the provided configuration.
+
+The onboarding process consists of three steps:
+
+1. Create the federation source configuration JSON.
+2. Copy the configuration and onboarding script into the Authentik container.
+3. Execute the onboarding script inside the Authentik container.
+
+> **Prerequisite:** Authentik must already be running before performing federation and social login source onboarding.
+
+### Step 1: Create the Federation Source Configuration
+
+Create the Participant-specific configuration file:
+
+```text
+config-for-onboarding-tvl-participant.json
+```
+
+From the Dataspace Operator root directory:
+
+```bash
+cd ~/user-management/dataspace-operator
+```
+
+Create the configuration file:
+
+```bash
+nano config-for-onboarding-tvl-participant.json
+```
+
+After creating the file, copy it into the running Authentik server container:
+
+```bash
+docker cp config-for-onboarding-tvl-participant.json authentik-server:/tmp/
+```
+
+The configuration file contains the parameters required to create the federation/social login source for the Participant.
+
+### Step 2: Create and Copy the Federation Source Script
+
+Navigate to the Authentik configuration directory:
+
+```bash
+cd ~/user-management/dataspace-operator/authentik
+```
+
+Create the federation source creation script:
+
+```bash
+nano create_federation_source.py
+```
+
+Copy the script into the running Authentik server container:
+
+```bash
+docker cp create_federation_source.py authentik-server:/tmp/
+```
+
+At this point, the Authentik container should contain both files:
+
+```text
+/tmp/config-for-onboarding-tvl-participant.json
+/tmp/create_federation_source.py
+```
+
+### Step 3: Run the Federation Source Onboarding
+
+Execute the script inside the Authentik server container:
+
+```bash
+docker exec -it authentik-server \
+  /ak-root/.venv/bin/python \
+  /tmp/create_federation_source.py \
+  --config /tmp/config-for-onboarding-tvl-participant.json
+```
+
+The script reads the Participant-specific configuration and creates the federation/social login source in Authentik.
+
+### Federation Source Onboarding Flow
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant Host as Dataspace Operator Host
+    participant Auth as Authentik Server Container
+    participant Config as Federation Configuration
+    participant Script as create_federation_source.py
+    participant Source as Federation / Social Login Source
+
+    Operator->>Host: Create configuration JSON
+    Host->>Auth: Copy configuration to /tmp
+    Operator->>Host: Create federation source script
+    Host->>Auth: Copy script to /tmp
+    Operator->>Auth: Execute Python script
+    Auth->>Config: Read participant configuration
+    Auth->>Script: Execute source creation
+    Script->>Source: Create federation/social login source
+    Source-->>Script: Source created
+    Script-->>Operator: Onboarding completed
+```
+
+---
+
+## Services
+
+### Authentik
+
+Authentik provides identity and authentication for the Dataspace Operator.
+
+Operator-specific Authentik configuration is provided through:
+
+```text
+authentik/dataspace_operator_blueprint.py
+```
+
+and:
+
+```text
+docker-compose/authentik/blueprints/dataspace-operator-authentik-blueprint.yaml
+```
+
+The Authentik configuration is also responsible for generating the Marketplace configuration:
+
+```text
+.env.market
+```
+
+---
+
+### OpenBao
+
+OpenBao provides secrets management.
+
+The source configuration includes:
+
+```text
+docker-compose/openbao/
+├── certs/
+├── secrets/
+├── private_keys/
+├── Dockerfile
+├── docker-entrypoint.sh
+├── init-vault.sh
+├── manage-accounts.sh
+└── openbao.hcl
+```
+
+The `secrets/`, `private_keys/`, and certificate material should be treated as sensitive.
+
+---
+
+### PostgreSQL
+
+PostgreSQL provides the database backend.
+
+Database initialization is handled through:
+
+```text
+docker-compose/postgres-init/create-authentik-db.sh
+```
+
+---
+
+### Signer Server
+
+The Signer Server provides signing functionality.
+
+Its configuration and certificates are located under:
+
+```text
+docker-compose/signer-server/
+```
+
+---
+
+### Traefik
+
+Traefik provides reverse proxy and TLS functionality.
+
+Its configuration is located under:
+
+```text
+docker-compose/traefik/
+├── certs/
+└── dynamic/
+```
+
+---
+
+### Wallet API
+
+The Wallet API provides backend wallet functionality.
+
+Configuration and data directories are located under:
+
+```text
+docker-compose/wallet-api/
+├── config/
+└── data/
+```
+
+---
+
+### Wallet UI
+
+The Wallet UI provides the frontend wallet interface.
+
+Its service-specific environment configuration is generated as:
+
+```text
+docker-compose/wallet-ui/.env.wallet-ui
+```
+
+---
+
+## Stopping the Deployment
+
+Stop the running services:
 
 ```bash
 docker compose down
 ```
 
-To stop the deployment while preserving Docker-managed volumes:
-
-```bash
-docker compose down
-```
-
-Be careful when removing volumes because persistent service data may be stored there.
+Do not remove persistent volumes unless you intentionally want to remove stored service data.
 
 ---
 
-# Restarting Services
+## Updating the Deployment
 
-To restart the complete deployment:
-
-```bash
-docker compose restart
-```
-
-To restart an individual service:
-
-```bash
-docker compose restart <service-name>
-```
-
----
-
-# Updating the Deployment
-
-When configuration or images are updated, review the changes before restarting the stack.
-
-A typical update flow is:
+Pull the latest repository changes:
 
 ```bash
 git pull
 ```
 
-Then:
+Review changes to configuration and setup scripts.
+
+Pull updated images:
 
 ```bash
 docker compose pull
 ```
 
-and:
+Start the updated deployment:
 
 ```bash
 docker compose up -d
 ```
 
-If the deployment contains locally built images, rebuild them as required:
+If images need to be rebuilt locally:
 
 ```bash
 docker compose build
@@ -465,172 +684,99 @@ docker compose up -d
 
 ---
 
-# Participant Onboarding
+## Troubleshooting
 
-One of the specific capabilities of the Dataspace Operator deployment is participant onboarding.
-
-The relevant tooling is located under:
-
-```text
-docker-compose/authentik/
-├── participant-configs/
-├── scripts/
-│   └── dataspace_operator_add_participant.py
-└── onboard-participant.sh
-```
-
-The exact onboarding workflow should be performed through the provided scripts rather than manually modifying generated configuration.
-
-Before onboarding a participant, make sure the operator's:
-
-* authentication configuration
-* certificates
-* participant configuration
-* secrets
-* wallet configuration
-* routing configuration
-
-are correctly configured.
-
----
-
-# Security
-
-This deployment contains sensitive infrastructure.
-
-Pay particular attention to:
-
-```text
-.env*
-certs/
-secrets/
-private_keys/
-```
-
-Production deployments should use securely managed:
-
-* passwords
-* API credentials
-* signing keys
-* private keys
-* TLS certificates
-* database credentials
-* OpenBao credentials
-
-Never commit production secrets or private keys to Git.
-
----
-
-# Troubleshooting
-
-## Check service status
+Check service status:
 
 ```bash
 docker compose ps
 ```
 
-## Check all logs
+Check all logs:
 
 ```bash
 docker compose logs
 ```
 
-## Check one service
+Check a specific service:
 
 ```bash
 docker compose logs <service-name>
 ```
 
-## Follow logs
+For Authentik specifically:
 
 ```bash
-docker compose logs -f <service-name>
+docker compose logs -f authentik-server
 ```
 
-## Check configuration
+### Federation Source Onboarding
 
-If the deployment fails to start, first check:
+If federation source onboarding fails, verify:
 
-1. `.env`
-2. `.env.config`
-3. service-specific `.env` files
-4. certificates
-5. DNS/hostnames
-6. Docker volumes
-7. service dependencies
-8. OpenBao initialization
-9. PostgreSQL initialization
-10. Traefik routing configuration
+1. Authentik is running.
+2. The `authentik-server` container exists.
+3. `config-for-onboarding-tvl-participant.json` was copied successfully.
+4. `create_federation_source.py` was copied successfully.
+5. Both files exist under `/tmp/` inside the container.
+6. The configuration contains the required Participant/federation parameters.
+7. The Python command uses the Python environment available inside the Authentik container.
+
+Verify that the files exist inside the container:
+
+```bash
+docker exec -it authentik-server ls -l /tmp/
+```
+
+### `.env.market` Generation
+
+If `.env.market` is not generated, verify:
+
+1. Authentik has been started successfully.
+2. The Dataspace Operator Authentik blueprint has been executed.
+3. `authentik/dataspace_operator_blueprint.py` completed without errors.
+4. The required Dataspace Operator configuration is present.
+5. Check the Authentik logs for blueprint/configuration errors.
 
 ---
 
-# Deployment Flow
+## Security
 
-The recommended high-level flow is:
+The Dataspace Operator deployment manages authentication, credentials, secrets, certificates, and private keys.
+
+Never commit production secrets or private keys.
+
+The following should be treated as sensitive:
 
 ```text
-1. Clone repository
-        │
-        ▼
-2. Enter dataspace-operator/
-        │
-        ▼
-3. Configure environment files
-        │
-        ▼
-4. Configure certificates and secrets
-        │
-        ▼
-5. Run initial setup
-        │
-        ▼
-6. Start Docker Compose
-        │
-        ▼
-7. Verify services
-        │
-        ▼
-8. Verify authentication
-        │
-        ▼
-9. Verify wallet services
-        │
-        ▼
-10. Onboard participants
+docker-compose/openbao/secrets/
+docker-compose/openbao/private_keys/
+docker-compose/openbao/certs/
+docker-compose/traefik/certs/
+docker-compose/signer-server/certs/
+.env.config
+generated .env files
+.env.market
 ```
+
+The `.env.market` file is generated for integration with the Ocean Enterprise Marketplace and should only be shared with the intended Marketplace deployment/operator.
+
+For production deployments:
+
+* Use strong credentials.
+* Use production TLS certificates.
+* Protect private keys.
+* Restrict access to OpenBao.
+* Review Traefik exposure.
+* Secure Docker volumes.
+* Ensure generated environment files are not committed.
+* Protect `.env.market` according to the sensitivity of the values it contains.
 
 ---
 
-# Production Deployment Checklist
+## Related Documentation
 
-* [ ] Production domain names configured.
-* [ ] Production TLS certificates installed.
-* [ ] TLS private keys secured.
-* [ ] Strong database credentials configured.
-* [ ] OpenBao initialized securely.
-* [ ] Production secrets stored securely.
-* [ ] Signer Server configured.
-* [ ] Traefik routing reviewed.
-* [ ] Wallet API configured.
-* [ ] Wallet UI configured.
-* [ ] Authentik configuration verified.
-* [ ] Docker volumes backed up.
-* [ ] Required firewall rules configured.
-* [ ] Participant onboarding tested.
-* [ ] Service health verified.
+* [User Management](../README.md)
+* [Participant](../participant/README.md)
 
----
-
-# Related Documentation
-
-For the overall repository architecture, see:
-
-```text
-../README.md
-```
-
-For participant deployment documentation, see:
-
-```text
-../participant/README.md
 ```
