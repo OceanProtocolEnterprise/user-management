@@ -1,93 +1,30 @@
 # Participant
 
-The `participant` module provides the deployment and configuration tooling required to provision a **Participant** for the Ocean Enterprise Marketplace ecosystem.
+The Participant module deploys the services required to operate an Ocean Enterprise Dataspace Participant environment.
 
-The deployment is based on Docker Compose and provides authentication, secrets management, database, signing, reverse proxy, and wallet services.
+The deployment includes identity management, wallet, signing, database, secret-management, and reverse-proxy services.
 
----
-
-# Contents
-
-* [Overview](#overview)
-* [Prerequisites](#prerequisites)
-* [Directory Structure](#directory-structure)
-* [Configuration](#configuration)
-* [Generated `.env` Files](#generated-env-files)
-* [Initial Setup](#initial-setup)
-* [Starting the Deployment](#starting-the-deployment)
-* [Services](#services)
-* [Stopping the Deployment](#stopping-the-deployment)
-* [Updating the Deployment](#updating-the-deployment)
-* [Troubleshooting](#troubleshooting)
-* [Security](#security)
-* [Related Documentation](#related-documentation)
+The Participant also integrates with the **Central Identity Provider (Central IdP)** provided by the Dataspace Operator.
 
 ---
 
-# Overview
+## Included services
 
-The Participant deployment contains the following major components:
+The Participant Docker Compose stack contains:
 
-| Component     | Purpose                     |
-| ------------- | --------------------------- |
-| Authentik     | Identity and authentication |
-| OpenBao       | Secrets management          |
-| PostgreSQL    | Database backend            |
-| Signer Server | Signing functionality       |
-| Traefik       | Reverse proxy and TLS       |
-| Wallet API    | Wallet backend              |
-| Wallet UI     | Wallet frontend             |
-
-The complete deployment is orchestrated through:
-
-```text
-docker-compose.yml
-```
+- **Authentik** — Identity Provider for the Participant
+- **OpenBao** — Secret management
+- **PostgreSQL** — Database services
+- **Signer Server** — Blockchain transaction signing
+- **Traefik** — Reverse proxy and TLS termination
+- **Wallet API** — walt.id SSI Wallet API
+- **Wallet UI** — walt.id SSI Wallet UI
 
 ---
 
-# Prerequisites
+## Directory structure
 
-## Supported Operating Systems
-
-The initial setup script is intended to run on the following Unix distributions:
-
-* Fedora
-* Alpine Linux
-* openSUSE
-* CentOS
-
-## Required Software
-
-Install the latest stable versions of:
-
-* Git
-* Docker
-* Docker Compose
-
-Verify the installation:
-
-```bash
-docker --version
-docker compose version
-git --version
-```
-
-Python is required for the environment configuration script.
-
-Install the Python dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-# Directory Structure
-
-The source tree contains the configuration templates, deployment definitions, scripts, and service configuration.
-
-Generated service-specific `.env` files are not shown because they are created during the initial setup process.
+The initial Participant directory contains:
 
 ```text
 participant/
@@ -97,403 +34,516 @@ participant/
 ├── docker-compose/
 │   ├── authentik/
 │   │   ├── blueprints/
-│   │   │   └── participant-authentik-blueprint.yaml
 │   │   └── certs/
-│   │
 │   ├── openbao/
 │   │   ├── certs/
 │   │   └── secrets/
-│   │
 │   ├── postgres-init/
-│   │   └── create-authentik-db.sh
-│   │
 │   ├── signer-server/
 │   │   └── certs/
-│   │
 │   ├── traefik/
 │   │   ├── certs/
 │   │   └── dynamic/
-│   │
-│   └── wallet-api/
-│       ├── config/
-│       └── data/
+│   ├── wallet-api/
+│   │   ├── config/
+│   │   └── data/
+│   └── wallet-ui/
 │
-├── wallet-ui/
-├── .env
 ├── .env.config
-├── docker-compose.yml
 ├── participant_environment_configuration.py
 ├── participant-initial-setup.sh
 └── requirements.txt
+````
+
+The service-specific `.env.*` files are generated during the setup process and are therefore not shown as initial files.
+
+---
+
+## Prerequisites
+
+Before starting the deployment, make sure that:
+
+* Docker is installed.
+* Docker Compose is installed.
+* Docker and Docker Compose are up to date.
+* The initialization script can be executed on the target Unix-like operating system.
+* Required blockchain RPC provider URLs are available.
+* Required database passwords and secret values are available.
+* The Marketplace URL is known.
+* The Dataspace Operator has provided the required Central IdP configuration.
+
+The initial setup scripts support Unix-like environments including:
+
+* Fedora
+* Alpine
+* openSUSE
+* CentOS
+
+---
+
+## Central Identity Provider prerequisite
+
+The **Dataspace Operator should provide the Participant with the configuration details of the Central Identity Provider** before Participant initialization.
+
+The Participant requires the following Central IdP information:
+
+* Central IdP Well-Known URL
+* Central IdP client ID
+* Central IdP client secret
+* Central IdP provider name
+
+These values are configured in:
+
+```text
+participant/.env.config
+```
+
+Example:
+
+```dotenv
+CENTRAL_IDP_WELL_KNOWN_URL=https://<central-idp-host>:9443/application/o/<application>/.well-known/openid-configuration
+CENTRAL_IDP_CLIENT_ID=<central-idp-client-id>
+CENTRAL_IDP_CLIENT_SECRET=<central-idp-client-secret>
+CENTRAL_IDP_PROVIDER_NAME=<central-idp-provider-name>
+```
+
+The Central IdP must be accessible when the Participant initialization is performed.
+
+---
+
+## Configuration
+
+The Participant deployment uses two main configuration inputs:
+
+* `.env.config`
+* `docker-compose/.env`
+
+### `.env.config`
+
+The file:
+
+```text
+participant/.env.config
+```
+
+contains the deployment-specific configuration.
+
+The main configuration areas are:
+
+* Ocean Enterprise Marketplace
+* Central Identity Provider
+* Signer Server
+* Wallet UI
+* Wallet API
+* PostgreSQL
+* Participant Identity Provider
+* Authentik
+* SMTP
+
+---
+
+### Marketplace
+
+Configure the Marketplace URL:
+
+```dotenv
+MARKETPLACE_URL=https://market.example.com/
 ```
 
 ---
 
-# Configuration
+### Central Identity Provider
 
-The Participant deployment uses two main input configuration files.
+The Participant consumes the Central IdP configuration provided by the Dataspace Operator.
 
-## `.env`
+Configure:
 
-`.env` contains the **Docker image tags and versions** used by the deployment.
+```dotenv
+CENTRAL_IDP_WELL_KNOWN_URL=<central-idp-well-known-url>
+CENTRAL_IDP_CLIENT_ID=<central-idp-client-id>
+CENTRAL_IDP_CLIENT_SECRET=<central-idp-client-secret>
+CENTRAL_IDP_PROVIDER_NAME=<central-idp-provider-name>
+```
 
-It determines which versions of the container images are deployed.
+These values must correspond to the Central IdP configuration provided by the Dataspace Operator.
 
-## `.env.config`
+---
 
-`.env.config` contains the Participant deployment configuration.
+### Signer Server
 
-It is consumed by:
+Configure the blockchain RPC providers in `NODE_URI_MAP`.
+
+Example:
+
+```dotenv
+NODE_URI_MAP='[{"11155111":{"key":"<your-sepolia-rpc-provider-url>","multiplier":3}},{"11155420":{"key":"<your-optimism-sepolia-rpc-provider-url>","multiplier":2}},{"10":{"key":"<your-optimism-rpc-provider-url>","multiplier":1.5}},{"1":{"key":"<your-mainnet-rpc-provider-url>","multiplier":2}}]'
+```
+
+Only include the blockchains required by the deployment.
+
+---
+
+### Wallet UI
+
+Configure:
+
+```dotenv
+WALLET_UI_URL=https://waltid-ui.oceanenterprise.io
+NUXT_ADMIN_USER_GROUP_NAME=""
+```
+
+`NUXT_ADMIN_USER_GROUP_NAME` should contain the Authentik administrator group used to access the Wallet UI.
+
+---
+
+### Wallet API
+
+Configure:
+
+```dotenv
+WALLET_API_URL=https://waltid-api.oceanenterprise.io
+DB_PASSWORD='<your-wallet-api-database-password>'
+```
+
+---
+
+### PostgreSQL
+
+Configure:
+
+```dotenv
+POSTGRES_PASSWORD='<your-root-user-database-password>'
+```
+
+---
+
+### Participant Identity Provider
+
+Configure the Participant Identity Provider hostname and ports:
+
+```dotenv
+PARTICIPANT_IDP_HOSTNAME=<participant-idp-hostname>
+PARTICIPANT_IDP_PORT_HTTP=9000
+PARTICIPANT_IDP_PORT_HTTPS=9443
+```
+
+Configure the Authentik application and provider:
+
+```dotenv
+AUTHENTIK_APP_SLUG=<participant-authentik-app-slug>
+AUTHENTIK_PROVIDER_NAME=<participant-authentik-provider-name>
+```
+
+Configure the Authentik database password and secret key:
+
+```dotenv
+AUTHENTIK_POSTGRESQL__PASSWORD='<authentik-database-password>'
+AUTHENTIK_SECRET_KEY='<authentik-secret-key>'
+```
+
+---
+
+### SMTP
+
+SMTP configuration is optional.
+
+If outbound email is required, configure:
+
+```dotenv
+AUTHENTIK_EMAIL__FROM=<support-email>
+AUTHENTIK_EMAIL__USERNAME=<smtp-username>
+AUTHENTIK_EMAIL__PASSWORD=<smtp-password>
+AUTHENTIK_EMAIL__HOST=<smtp-host>
+AUTHENTIK_EMAIL__PORT=<smtp-port>
+```
+
+---
+
+### Authentik blueprint output
+
+The generated Participant Authentik blueprint is configured through:
+
+```dotenv
+AUTHENTIK_OUTPUT_FILE=participant-authentik-blueprint.yaml
+```
+
+---
+
+## `docker-compose/.env`
+
+The file:
+
+```text
+participant/docker-compose/.env
+```
+
+contains the Docker image tags/versions and common Docker Compose values.
+
+The current recommended image tags are:
+
+```dotenv
+WALLET_API_TAG=gaiax-0.1.1-OE
+DEV_WALLET_TAG=gaiax-0.1.5-OE
+AUTHENTIK_TAG=2026.5.5
+SIGNER_SERVER_TAG=v0.5.3
+```
+
+Common values include:
+
+```dotenv
+SERVICE_HOST=localhost
+WALLET_BACKEND_PORT=7001
+NITRO_PORT=7104
+PORT=7104
+HOST=0.0.0.0
+NITRO_HOST=0.0.0.0
+
+WALLET_API_HOST=waltid-api.oceanenterprise.io
+WALLET_UI_HOST=waltid-ui.oceanenterprise.io
+```
+
+The file is generated by:
 
 ```text
 participant_environment_configuration.py
 ```
 
-The configuration script uses `.env.config` to generate the service-specific environment files required by the deployment.
-
-Users should configure `.env.config` rather than manually creating or editing individual service `.env` files.
+Do not normally edit it manually. If a different image version is intentionally required, update the image tag configuration according to the deployment process and regenerate the environment.
 
 ---
 
-# Generated `.env` Files
+## Generated service-specific `.env` files
 
-The initial setup/configuration process generates service-specific environment files.
+The environment configuration process generates the `.env.*` files required by the individual services.
 
-These include:
+Examples include:
 
 ```text
 docker-compose/authentik/.env.authentik
 docker-compose/openbao/.env.openbao
-docker-compose/postgres-init/.env.postgres
 docker-compose/signer-server/.env.signer-server
 docker-compose/traefik/.env.traefik
 docker-compose/wallet-api/.env.wallet-api
 docker-compose/wallet-ui/.env.wallet-ui
 ```
 
-These files are generated from the deployment configuration.
-
-They should normally **not be edited manually**.
-
-To change a generated value:
-
-1. Update `.env` or `.env.config`.
-2. Run the configuration/setup process again.
-3. Verify the generated files.
-4. Restart the affected services if required.
+These files are generated from `.env.config` and should not normally be configured manually.
 
 ---
 
-# Initial Setup
+# Deployment
 
-The Participant module provides:
+The Participant deployment follows these steps.
+
+## 1. Obtain Central IdP configuration
+
+Before initializing the Participant, obtain the Central IdP configuration details from the Dataspace Operator.
+
+The required values are:
 
 ```text
-participant-initial-setup.sh
+CENTRAL_IDP_WELL_KNOWN_URL
+CENTRAL_IDP_CLIENT_ID
+CENTRAL_IDP_CLIENT_SECRET
+CENTRAL_IDP_PROVIDER_NAME
 ```
 
-The initial setup prepares the deployment and generates the service-specific configuration.
+---
 
-Make the script executable if required:
+## 2. Configure `.env.config`
+
+From the Participant directory, edit:
+
+```text
+.env.config
+```
+
+Configure the required values, including:
+
+* Marketplace URL
+* Central IdP configuration
+* Blockchain RPC providers
+* Wallet configuration
+* Database passwords
+* Participant Identity Provider configuration
+* Authentik configuration
+* SMTP configuration, if required
+
+---
+
+## 3. Review image tags
+
+Review:
+
+```text
+docker-compose/.env
+```
+
+The environment generation process creates this file with the recommended image tags.
+
+Update image tags only if a different version is intentionally required.
+
+---
+
+## 4. Run the initial setup
+
+Make the setup script executable:
 
 ```bash
 chmod +x participant-initial-setup.sh
 ```
 
-Run:
+Run the setup:
 
 ```bash
 ./participant-initial-setup.sh
 ```
 
-The initial setup should be completed before starting the Docker Compose stack on a new Participant deployment.
+The setup process generates the environment configuration required by the Docker Compose services and prepares the Participant deployment.
 
 ---
 
-# Deployment Flow
+## 5. Start the services
 
-The Participant deployment follows this sequence:
+Change to the Docker Compose directory:
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant Config as .env.config
-    participant Script as Environment Configuration
-    participant Setup as Initial Setup
-    participant Compose as Docker Compose
-    participant Services as Participant Services
-
-    User->>Config: Configure participant parameters
-    User->>Script: Run configuration/setup
-    Script->>Config: Read configuration
-    Config-->>Script: Return configuration
-    Script->>Script: Generate service .env files
-    Script-->>User: Configuration generated
-    User->>Setup: Run initial setup
-    Setup->>Compose: Prepare deployment
-    User->>Compose: docker compose up -d
-    Compose->>Services: Start Authentik
-    Compose->>Services: Start OpenBao
-    Compose->>Services: Start PostgreSQL
-    Compose->>Services: Start Signer Server
-    Compose->>Services: Start Traefik
-    Compose->>Services: Start Wallet API
-    Compose->>Services: Start Wallet UI
-    Services-->>User: Participant deployment available
+```bash
+cd docker-compose
 ```
 
----
-
-# Starting the Deployment
-
-After the initial setup has completed:
+Start the services:
 
 ```bash
 docker compose up -d
 ```
 
-Check the running services:
+---
+
+## 6. Verify the deployment
+
+Check the running containers:
 
 ```bash
 docker compose ps
 ```
 
-View logs:
+Review logs when troubleshooting:
 
 ```bash
 docker compose logs
 ```
 
-Follow logs:
-
-```bash
-docker compose logs -f
-```
-
-Follow logs for a specific service:
-
-```bash
-docker compose logs -f <service-name>
-```
-
----
-
-# Services
-
-## Authentik
-
-Authentik provides identity and authentication for the Participant.
-
-Participant-specific configuration is provided through:
-
-```text
-authentik/participant_blueprint.py
-```
-
-and:
-
-```text
-docker-compose/authentik/blueprints/participant-authentik-blueprint.yaml
-```
-
-The Participant deployment uses its own Authentik blueprint and configuration, separate from the Dataspace Operator deployment.
-
----
-
-## OpenBao
-
-OpenBao provides secrets management.
-
-The deployment contains:
-
-```text
-docker-compose/openbao/
-├── certs/
-├── secrets/
-├── Dockerfile
-├── docker-entrypoint.sh
-├── init-vault.sh
-├── manage-accounts.sh
-└── openbao.hcl
-```
-
-OpenBao is responsible for securely managing secrets and credentials required by the deployment.
-
----
-
-## PostgreSQL
-
-PostgreSQL provides the database backend.
-
-Database initialization is handled through:
-
-```text
-docker-compose/postgres-init/create-authentik-db.sh
-```
-
----
-
-## Signer Server
-
-The Signer Server provides signing functionality required by the Participant deployment.
-
-Its certificates and generated configuration are located under:
-
-```text
-docker-compose/signer-server/
-```
-
----
-
-## Traefik
-
-Traefik provides reverse proxy and TLS functionality.
-
-Its source configuration is located under:
-
-```text
-docker-compose/traefik/
-├── certs/
-└── dynamic/
-```
-
----
-
-## Wallet API
-
-The Wallet API provides backend wallet functionality.
-
-Its source configuration and data directories are located under:
-
-```text
-docker-compose/wallet-api/
-├── config/
-└── data/
-```
-
----
-
-## Wallet UI
-
-The Wallet UI provides the frontend wallet interface.
-
-Its generated environment configuration is:
-
-```text
-docker-compose/wallet-ui/.env.wallet-ui
-```
-
----
-
-# Stopping the Deployment
-
-Stop the deployment with:
-
-```bash
-docker compose down
-```
-
-Avoid removing persistent Docker volumes unless the stored application data is no longer required.
-
----
-
-# Updating the Deployment
-
-Pull the latest repository changes:
-
-```bash
-git pull
-```
-
-Review configuration and setup changes.
-
-Pull updated images:
-
-```bash
-docker compose pull
-```
-
-Start the updated deployment:
-
-```bash
-docker compose up -d
-```
-
-If local images need to be rebuilt:
-
-```bash
-docker compose build
-docker compose up -d
-```
-
----
-
-# Troubleshooting
-
-Check service status:
-
-```bash
-docker compose ps
-```
-
-View all logs:
-
-```bash
-docker compose logs
-```
-
-View a specific service:
+Individual service logs can be inspected with:
 
 ```bash
 docker compose logs <service-name>
 ```
 
-If the deployment fails during initialization, first verify:
+---
 
-1. `.env`
-2. `.env.config`
-3. generated service-specific `.env` files
-4. certificates
-5. Docker availability
-6. required ports
-7. PostgreSQL initialization
-8. OpenBao initialization
-9. Authentik configuration
-10. Traefik routing
-11. Wallet API configuration
+# Participant onboarding information
+
+After configuring the Participant Identity Provider, the Participant must provide the Dataspace Operator with the information required to configure federation/social login.
+
+The Participant generates a JSON configuration containing its Identity Provider details.
+
+The JSON configuration is then provided to the Dataspace Operator.
+
+The Dataspace Operator uses this information to configure the Participant federation/social-login source in the Central IdP.
 
 ---
 
-# Security
+## JSON configuration
 
-The Participant deployment handles authentication credentials, secrets, certificates, private keys, and other sensitive information.
+The JSON file contains the Participant Identity Provider configuration required by the Dataspace Operator.
 
-Never commit production secrets or private keys to Git.
+An example structure is:
 
-Treat the following as sensitive:
-
-```text
-docker-compose/openbao/secrets/
-docker-compose/openbao/certs/
-docker-compose/traefik/certs/
-docker-compose/signer-server/certs/
-.env.config
-generated .env files
+```json
+{
+  "participant_idp_well_known_url": "https://participant.example.com:9443/application/o/participant-app/.well-known/openid-configuration",
+  "participant_idp_consumer_key": "<participant-client-id>",
+  "participant_idp_consumer_secret": "<participant-client-secret>",
+  "authentik_app_slug": "participant-federated-app",
+  "participant_redirect_uris": [
+    "https://waltid-ui.example.com/auth/callback",
+    "https://waltid-ui.example.com/auth/login",
+    "https://waltid-ui.example.com"
+  ],
+  "central_idp_provider_name": "oe-market"
+}
 ```
 
-For production deployments:
+The values must match the Participant Identity Provider configuration.
 
-* use strong credentials;
-* use production TLS certificates;
-* protect private keys;
-* restrict access to OpenBao;
-* review Traefik exposure;
-* secure Docker volumes;
-* ensure generated environment files are not committed.
+The following information is especially important:
+
+* `participant_idp_well_known_url` — Participant Identity Provider OpenID Connect Well-Known URL.
+* `participant_idp_consumer_key` — Participant Identity Provider client/consumer identifier.
+* `participant_idp_consumer_secret` — Participant Identity Provider client/consumer secret.
+* `authentik_app_slug` — Participant Authentik application slug.
+* `participant_redirect_uris` — Redirect URIs used by the Participant application.
+* `central_idp_provider_name` — Central IdP provider name configured for the Marketplace.
+
+The consumer secret is sensitive and must be transferred securely.
 
 ---
 
-# Related Documentation
+## Participant-to-Dataspace-Operator onboarding flow
 
-* [User Management](../README.md)
-* [Dataspace Operator](../dataspace-operator/README.md)
+1. Configure the Participant `.env.config`.
+
+2. Configure the Participant Identity Provider.
+
+3. Run the Participant initial setup.
+
+4. Verify that the Participant Identity Provider is available.
+
+5. Prepare the Participant JSON configuration containing the Identity Provider details.
+
+6. Provide the JSON configuration to the Dataspace Operator.
+
+7. The Dataspace Operator places the JSON file in:
+
+   ```text
+   docker-compose/authentik/participant-configs/
+   ```
+
+8. The Dataspace Operator runs the Participant onboarding script.
+
+9. The Central IdP is configured with the Participant federation/social-login source.
+
+---
+
+## Stopping the deployment
+
+From the Docker Compose directory:
+
+```bash
+cd docker-compose
+```
+
+Stop the running services:
+
+```bash
+docker compose down
+```
+
+---
+
+## Security considerations
+
+The following values are sensitive and must not be committed with real production values:
+
+* `CENTRAL_IDP_CLIENT_SECRET`
+* `DB_PASSWORD`
+* `POSTGRES_PASSWORD`
+* `AUTHENTIK_POSTGRESQL__PASSWORD`
+* `AUTHENTIK_SECRET_KEY`
+* `AUTHENTIK_EMAIL__PASSWORD`
+* Blockchain RPC credentials where applicable
+* `participant_idp_consumer_secret`
+
+Use secure, deployment-specific values in `.env.config`.
+
+Generated `.env.*` files and the Participant JSON configuration should also be treated as sensitive configuration.
