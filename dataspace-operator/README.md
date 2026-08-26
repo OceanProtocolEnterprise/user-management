@@ -387,7 +387,7 @@ sequenceDiagram
     participant Auth as Authentik
     participant Script as Onboarding Script
     participant Config as Participant Config
-    participant Participant as Participant
+    participant DSParticipant as Participant
 
     Operator->>Script: Start participant onboarding
     Script->>Config: Read participant configuration
@@ -395,7 +395,7 @@ sequenceDiagram
     Script->>Auth: Configure participant
     Auth-->>Script: Participant configuration created
     Script-->>Operator: Onboarding completed
-    Operator->>Participant: Verify participant connectivity
+    Operator->>DSParticipant: Verify participant connectivity
 ```
 
 ### Running the onboarding script
