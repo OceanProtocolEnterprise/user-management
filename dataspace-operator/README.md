@@ -50,6 +50,8 @@ dataspace-operator/
 │   │   ├── config/
 │   │   └── data/
 │   └── wallet-ui/
+│   │   
+│   └── .env
 │
 ├── .env.config
 ├── dataspace_operator_environment_configuration.py
@@ -390,7 +392,7 @@ dataspace-operator/.env.market
 
 The generated file should be provided to the Marketplace deployment team/operator so that the Marketplace can be configured to use the Dataspace Operator Central IdP.
 
-Do not manually invent or modify the generated values unless required by the Marketplace deployment process.
+Do not manually add or modify the generated values unless required by the Marketplace deployment process.
 
 ---
 
@@ -457,13 +459,13 @@ Treat the client/consumer secret as sensitive information.
 
 ## Run Participant onboarding
 
-From the Dataspace Operator directory, run:
+From the dataspace-operator/docker-compose/authentik, run:
 
 ```bash
-./docker-compose/authentik/onboard-participant.sh
+./onboard-participant.sh <config-file-for-onboarding-participant.json>
 ```
 
-The script reads the Participant configuration from:
+The script reads the Participant configuration file from:
 
 ```text
 docker-compose/authentik/participant-configs/
@@ -477,7 +479,7 @@ The onboarding should be performed using the provided onboarding script rather t
 
 ## Stopping the deployment
 
-From the Docker Compose directory:
+From the docker-compose directory:
 
 ```bash
 cd docker-compose

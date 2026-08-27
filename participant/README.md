@@ -48,6 +48,8 @@ participant/
 │   │   ├── config/
 │   │   └── data/
 │   └── wallet-ui/
+│   │   
+│   └── .env      
 │
 ├── .env.config
 ├── participant_environment_configuration.py
@@ -474,7 +476,6 @@ An example structure is:
 }
 ```
 
-The values must match the Participant Identity Provider configuration.
 
 The following information is especially important:
 
@@ -487,37 +488,10 @@ The following information is especially important:
 
 The consumer secret is sensitive and must be transferred securely.
 
----
-
-## Participant-to-Dataspace-Operator onboarding flow
-
-1. Configure the Participant `.env.config`.
-
-2. Configure the Participant Identity Provider.
-
-3. Run the Participant initial setup.
-
-4. Verify that the Participant Identity Provider is available.
-
-5. Prepare the Participant JSON configuration containing the Identity Provider details.
-
-6. Provide the JSON configuration to the Dataspace Operator.
-
-7. The Dataspace Operator places the JSON file in:
-
-   ```text
-   docker-compose/authentik/participant-configs/
-   ```
-
-8. The Dataspace Operator runs the Participant onboarding script.
-
-9. The Central IdP is configured with the Participant federation/social-login source.
-
----
 
 ## Stopping the deployment
 
-From the Docker Compose directory:
+From the docker-compose directory:
 
 ```bash
 cd docker-compose
