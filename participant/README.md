@@ -461,16 +461,16 @@ An example structure is:
 
 ```json
 {
-  "participant_idp_well_known_url": "https://participant.example.com:9443/application/o/participant-app/.well-known/openid-configuration",
+  "participant_idp_well_known_url": "https://participant.example.com:9443/application/o/<participant-app-slug>/.well-known/openid-configuration",
   "participant_idp_consumer_key": "<participant-client-id>",
   "participant_idp_consumer_secret": "<participant-client-secret>",
-  "authentik_app_slug": "participant-federated-app",
+  "authentik_app_slug": "<participant-app-slug>",
   "participant_redirect_uris": [
     "https://waltid-ui.example.com/auth/callback",
     "https://waltid-ui.example.com/auth/login",
     "https://waltid-ui.example.com"
   ],
-  "central_idp_provider_name": "oe-market"
+  "central_idp_provider_name": "<central-idp-provider-name>"
 }
 ```
 
