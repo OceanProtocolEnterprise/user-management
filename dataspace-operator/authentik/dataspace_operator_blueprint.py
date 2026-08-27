@@ -13,7 +13,6 @@ Generates a complete blueprint YAML file for the main authentik instance with:
 - Email notification to admin when duplicate email is detected
 - SMTP config from .env or fallback to defaults
 - Web certificate discovery and brand update
-- Generates .env.market file with OIDC configuration for marketplace
 """
 
 import os
@@ -314,6 +313,50 @@ def save_marketplace_env(
         return False
 
 
+def save_federation_env(
+    client_id: str,
+    client_secret: str,
+    central_idp_hostname: str,
+    central_idp_port_https: str,
+    app_slug: str,
+    provider_name: str,
+    env_file: str = ".env.federation"
+):
+    """
+    Save federation configuration to .env.federation file.
+    
+    Generates the following variables:
+    - CENTRAL_IDP_WELL_KNOWN_URL=https://{hostname}:{port}/application/o/{app_slug}/.well-known/openid-configuration
+    - CENTRAL_IDP_CLIENT_ID={client_id}
+    - CENTRAL_IDP_CLIENT_SECRET={client_secret}
+    - CENTRAL_IDP_PROVIDER_NAME={provider_name}
+    """
+    try:
+        base_url = f"https://{central_idp_hostname}:{central_idp_port_https}"
+        well_known_url = f"{base_url}/application/o/{app_slug}/.well-known/openid-configuration"
+        
+        env_vars = {
+            "CENTRAL_IDP_WELL_KNOWN_URL": well_known_url,
+            "CENTRAL_IDP_CLIENT_ID": client_id,
+            "CENTRAL_IDP_CLIENT_SECRET": client_secret,
+            "CENTRAL_IDP_PROVIDER_NAME": provider_name
+        }
+        
+        with open(env_file, 'w') as f:
+            f.write("# FEDERATION CONFIGURATION FOR AUTHENTIK\n")
+            for var_name, var_value in env_vars.items():
+                f.write(f"{var_name}={var_value}\n")
+        
+        print(f"\nFederation configuration saved to {env_file}")
+        print(f"   Well-Known URL: {well_known_url}")
+        print(f"   Client ID: {client_id}")
+        print(f"   Provider Name: {provider_name}")
+        return True
+    except Exception as e:
+        print(f"Could not save federation environment file: {e}")
+        return False
+
+
 def sanitize_url(url: str) -> str:
     url = url.strip()
     url = re.sub(r'^https?://+', 'https://', url)
@@ -395,6 +438,15 @@ def generate_blueprint(
         central_idp_port_https=central_idp_port_https,
         app_slug=app_slug,
         marketplace_url=marketplace_url
+    )
+    
+    save_federation_env(
+        client_id=client_id,
+        client_secret=client_secret,
+        central_idp_hostname=central_idp_hostname,
+        central_idp_port_https=central_idp_port_https,
+        app_slug=app_slug,
+        provider_name=provider_name
     )
     
     blueprint = {
