@@ -396,6 +396,35 @@ Do not manually add or modify the generated values unless required by the Market
 
 ---
 
+## Federation configuration
+
+The Dataspace Operator Authentik blueprint generation script also generates:
+
+```text
+dataspace-operator/.env.federation
+```
+
+### Purpose of `.env.federation`
+
+`.env.federation` contains the **environment variables required by the Participant to configure its user-management pack to use the Central Identity Provider (Central IdP) for user authentication**.
+
+The generated file must be provided by the Dataspace Operator to the Participant as part of the Participant deployment configuration.
+
+The file contains the Central IdP configuration required by the Participant:
+
+```dotenv
+CENTRAL_IDP_WELL_KNOWN_URL=https://<central-idp-hostname>:9443/application/o/<central-idp-app-slug>/.well-known/openid-configuration
+CENTRAL_IDP_CLIENT_ID=<central-idp-client-id>
+CENTRAL_IDP_CLIENT_SECRET=<central-idp-client-secret>
+CENTRAL_IDP_PROVIDER_NAME=<central-idp-provider-name>
+```
+
+The Participant uses these environment variables to configure the federation between the Participant user-management pack and the Dataspace Operator Central Identity Provider.
+
+The `.env.federation` file contains sensitive credentials and must be transferred securely to the Participant. Do not commit the generated file with real credentials to source control.
+
+---
+
 # Participant onboarding
 
 The Dataspace Operator can onboard a Participant by configuring a federation/social-login source in the Central Identity Provider.
