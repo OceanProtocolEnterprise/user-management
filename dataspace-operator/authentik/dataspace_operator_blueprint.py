@@ -13,6 +13,8 @@ Generates a complete blueprint YAML file for the main authentik instance with:
 - Email notification to admin when duplicate email is detected
 - SMTP config from .env or fallback to defaults
 - Web certificate discovery and brand update
+- Generates .env.market file with OIDC configuration for marketplace
+- Generates .env.federation file with OIDC configuration for participant user-management deployment
 """
 
 import os
