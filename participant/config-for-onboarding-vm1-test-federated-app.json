@@ -1,7 +1,7 @@
 {
   "participant_idp_well_known_url": "https://vm1-test.oceanenterprise.io:9443/application/o/vm1-test-federated-app/.well-known/openid-configuration",
-  "participant_idp_consumer_key": "vty3mxyoh6ifhn3vv6pcng9bvu70jtvy",
-  "participant_idp_consumer_secret": "xrrBCAE7iOYOjsMZx4jY_uWu7EODc8_yKEVQJui72Kr",
+  "participant_idp_consumer_key": "",
+  "participant_idp_consumer_secret": "",
   "authentik_app_slug": "vm1-test-federated-app",
   "participant_redirect_uris": [
     "https://waltid-ui.oceanenterprise.io/auth/callback",
