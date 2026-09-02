@@ -1,143 +1,291 @@
-# 🚀 Authentik Blueprint Automation Suite
+# User Management
 
-[![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Authentik](https://img.shields.io/badge/Authentik-2026.5%2B-orange.svg)](https://goauthentik.io/)
+User Management provides deployment automation for the identity, wallet, signing, database, and supporting services required by **Ocean Enterprise Dataspace Operators** and **Dataspace Participants**.
 
-Automated blueprint generator for Authentik Identity Provider (IDP) and Main OIDC instances.
+The repository contains two independent deployment modules:
 
----
+- [Dataspace Operator](./dataspace-operator/README.md)
+- [Participant](./participant/README.md)
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Output](#output)
-- [Directory Structure](#directory-structure)
-- [Troubleshooting](#troubleshooting)
-- [Examples](#examples)
-- [Contributing](#contributing)
-- [License](#license)
+Each module contains its own configuration, initialization scripts, Docker Compose services, and service-specific deployment resources.
 
 ---
 
-## 📖 Overview
+## Repository structure
 
-This automation suite helps you quickly generate Authentik blueprint YAML files with pre-configured:
+```text
+user-management/
+├── dataspace-operator/
+│   ├── authentik/
+│   │   └── dataspace_operator_blueprint.py
+│   ├── docker-compose/
+│   │   ├── authentik/
+│   │   ├── openbao/
+│   │   ├── postgres-init/
+│   │   ├── signer-server/
+│   │   ├── traefik/
+│   │   ├── wallet-api/
+│   │   ├── wallet-ui/
+│   │   └── docker-compose.yml
+│   ├── .env.config
+│   ├── dataspace_operator_environment_configuration.py
+│   ├── dataspace-operator-initial-setup.sh
+│   └── README.md
+│
+├── participant/
+│   ├── authentik/
+│   │   └── participant_blueprint.py
+│   ├── docker-compose/
+│   │   ├── authentik/
+│   │   ├── openbao/
+│   │   ├── postgres-init/
+│   │   ├── signer-server/
+│   │   ├── traefik/
+│   │   ├── wallet-api/
+│   │   ├── wallet-ui/
+│   │   └── docker-compose.yml
+│   ├── .env.config
+│   ├── participant_environment_configuration.py
+│   ├── participant-initial-setup.sh
+│   └── README.md
+│
+├── .gitignore
+└── README.md
+````
 
-### 🔐 IDP Instance Blueprint
-- Custom enrollment flow with organization selection dropdown
-- User attribute saving (orgId, walletId, signerServer)
-- OAuth2 provider with custom scope mappings
-- Custom logout flow with redirect
-- All necessary policies, stages, and bindings
-
-### 🆔 Main OIDC Instance Blueprint
-- Recovery flow with email-based password reset
-- Federated JIT (Just-In-Time) enrollment for OAuth sources
-- Custom OAuth source property mapping (federated-oidc-mapping)
-- Custom scope mappings (organizationId, signerServer, walletId, federated_identity)
-- Policy for saving user attributes
-- OAuth2 provider with logout and backchannel logout
-
----
-
-## ✨ Features
-
-| Feature | IDP | Main OIDC |
-|---------|-----|-----------|
-| Custom Enrollment Flow | ✅ | ✅ |
-| Organization Selection | ✅ | ✅ |
-| User Attribute Saving | ✅ | ✅ |
-| Scope Mappings | ✅ | ✅ |
-| Recovery Flow | ❌ | ✅ |
-| Federated JIT Enrollment | ❌ | ✅ |
-| OAuth Source Mapping | ❌ | ✅ |
-| Custom Logout Flow | ✅ | ✅ |
-| Backchannel Logout | ✅ | ✅ |
-| Email Configuration | ❌ | ✅ |
-
----
-
-## 📌 Prerequisites
-
-| Requirement | Version | Notes |
-|-------------|---------|-------|
-| **Python** | 3.7 or later | Required for running scripts |
-| **pip** | Latest | Package installer |
-| **Authentik** | 2024.10+ | Running instance (Docker/K8s/VM) |
-| **Admin Access** | - | Authentik admin credentials |
+The service-specific `.env.*` files shown below are generated during the initialization process and are therefore not part of the initial directory structure.
 
 ---
 
-## 🚀 Quick Start
+## Deployment modules
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-repo/authentik-blueprint-automation.git
-cd authentik-blueprint-automation
+### Dataspace Operator
 
-# 2. Run the automated setup
-chmod +x setup.sh
-./setup.sh
+The [Dataspace Operator README](./dataspace-operator/README.md) describes how to configure and deploy the Dataspace Operator stack.
 
-# 3. Edit configuration files
-nano .env.idp
-nano .env.main-oidc
+The Dataspace Operator deployment includes services such as:
 
-# 4. Generate blueprints
-python generate.py
+* Authentik
+* OpenBao
+* PostgreSQL
+* Signer Server
+* Traefik
+* walt.id Wallet API
+* walt.id Wallet UI
 
-# 5. Find your blueprints in the output/ directory
-ls output/
+The Dataspace Operator also provides the **Central Identity Provider (Central IdP)** used by the Ocean Enterprise Marketplace and participating Dataspace Participants.
 
+### Participant
 
-## Manual start
+The [Participant README](./participant/README.md) describes how to configure and deploy the Participant stack.
 
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+The Participant deployment includes services such as:
 
-# Install dependencies
-pip install -r requirements.txt
+* Authentik
+* OpenBao
+* PostgreSQL
+* Signer Server
+* Traefik
+* walt.id Wallet API
+* walt.id Wallet UI
 
-# Create .env files from examples
-cp .env.idp.example .env.idp
-cp .env.main-oidc.example .env.main-oidc
+The Participant also provides its own Identity Provider configuration, which is used when establishing federation with the Dataspace Operator Central IdP.
 
-# Create output directories
-mkdir -p output logs
+---
 
-# Edit .env files with your configuration
-nano .env.idp
-nano .env.main-oidc
+## Configuration model
 
-python3 main_oidc_blueprint.py --env .env_main
+Both deployment modules use two main configuration inputs:
 
-python3 idp_generate_blueprint.py --env .env_idp
+1. `.env.config`
+2. `docker-compose/.env`
 
-# /////////////////////////////Federation and Social Login Source Onboarding \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-# running federation source file in authentik docker
-#Step 1 
-# create config-for-onboarding-tvl-participant.json and Copy the script to container
-# pwd :: ubuntu@vm1-stage:~/user-management/dataspace-operator
-nano config-for-onboarding-tvl-participant.json
-docker cp config-for-onboarding-tvl-participant.json authentik-server:/tmp/
+They have different purposes.
 
-#Step 2 
-# create create_oauth_source.py and Copy the script to container
-# pwd :: ubuntu@vm1-stage:~/user-management/dataspace-operator/authentik$ 
-nano create_federation_source.py
-docker cp create_federation_source.py authentik-server:/tmp/
+### `.env.config`
 
-# step 3 run this command 
-# pwd :: ubuntu@vm1-stage:~/user-management/dataspace-operator/authentik$ 
-docker exec -it authentik-server \
-  /ak-root/.venv/bin/python \
-  /tmp/create_federation_source.py \
-  --config /tmp/config-for-onboarding-tvl-participant.json
+`.env.config` is the **end-user configuration file**.
+
+It contains deployment-specific parameters such as:
+
+* Marketplace URL
+* Identity Provider configuration
+* Blockchain RPC providers
+* Wallet configuration
+* Database passwords
+* Authentik configuration
+* SMTP configuration
+
+The values in `.env.config` are used by the environment configuration script to generate the environment files required by the individual services.
+
+For example:
+
+```text
+.env.config
+    │
+    ▼
+Environment configuration script
+    │
+    ├── .env.authentik
+    ├── .env.openbao
+    ├── .env.signer-server
+    ├── .env.traefik
+    ├── .env.wallet-api
+    └── .env.wallet-ui
+```
+
+The exact generated files depend on the deployment module.
+
+### `docker-compose/.env`
+
+`docker-compose/.env` contains the Docker image tags/versions and common deployment values used by Docker Compose.
+
+For example:
+
+```dotenv
+WALLET_API_TAG=gaiax-0.1.1-OE
+DEV_WALLET_TAG=gaiax-0.1.5-OE
+AUTHENTIK_TAG=2026.5.5
+SIGNER_SERVER_TAG=v0.5.3
+```
+
+The file is generated by the corresponding environment configuration script. Do not normally edit it manually; rerunning the environment configuration script regenerates it.
+
+If a different image version is intentionally required, update the image tag configuration according to the project's deployment process before starting the deployment.
+
+### Current image tags
+
+The currently recommended image tags are:
+
+| Variable            | Value            |
+| ------------------- | ---------------- |
+| `WALLET_API_TAG`    | `gaiax-0.1.1-OE` |
+| `DEV_WALLET_TAG`    | `gaiax-0.1.5-OE` |
+| `AUTHENTIK_TAG`     | `2026.5.5`       |
+| `SIGNER_SERVER_TAG` | `v0.5.3`         |
+
+Common deployment values generated into `docker-compose/.env` include:
+
+```dotenv
+SERVICE_HOST=localhost
+WALLET_BACKEND_PORT=7001
+NITRO_PORT=7104
+PORT=7104
+HOST=0.0.0.0
+NITRO_HOST=0.0.0.0
+
+WALLET_API_HOST=waltid-api.oceanenterprise.io
+WALLET_UI_HOST=waltid-ui.oceanenterprise.io
+```
+
+---
+
+## Generated service configuration
+
+The deployment scripts generate service-specific environment files from `.env.config`.
+
+These files should not normally be configured manually.
+
+Examples include:
+
+```text
+docker-compose/authentik/.env.authentik
+docker-compose/openbao/.env.openbao
+docker-compose/signer-server/.env.signer-server
+docker-compose/traefik/.env.traefik
+docker-compose/wallet-api/.env.wallet-api
+docker-compose/wallet-ui/.env.wallet-ui
+```
+
+The generated files contain the configuration required by their respective services.
+
+---
+
+## Deployment workflow
+
+Both deployment modules follow the same high-level workflow:
+
+1. Clone the repository.
+
+2. Select the deployment module:
+
+   * [Dataspace Operator](./dataspace-operator/README.md)
+   * [Participant](./participant/README.md)
+
+3. Configure `.env.config` with the parameters required for the selected deployment.
+
+4. Update image tags in `docker-compose/.env` only if a version different from the generated/recommended version is required.
+
+5. Run the module's initial setup script.
+
+6. The environment configuration script generates the required service-specific `.env.*` files.
+
+7. The initial setup generates the required Authentik configuration and initializes the deployment.
+
+8. Start the Docker Compose services.
+
+9. Verify that the deployed services are available.
+
+For the exact configuration parameters and deployment commands, use the README for the selected module:
+
+* [Dataspace Operator deployment](./dataspace-operator/README.md)
+* [Participant deployment](./participant/README.md)
+
+---
+
+The exact onboarding procedures are documented in:
+
+* [Dataspace Operator - Participant onboarding](./dataspace-operator/README.md)
+* [Participant - Central IdP configuration](./participant/README.md)
+
+---
+
+## Operating system and software requirements
+
+The initialization scripts are intended to run on Unix-like systems.
+
+The supported environments for the initial setup include:
+
+* Fedora
+* Alpine
+* openSUSE
+* CentOS
+
+The deployment requires:
+
+* Docker
+* Docker Compose
+
+Use current versions of Docker and Docker Compose.
+
+The user running the deployment must have permission to execute Docker commands and run the initialization scripts.
+
+---
+
+## Security considerations
+
+Configuration files can contain credentials and other sensitive information.
+
+Do not commit real:
+
+* Database passwords
+* Authentik secret keys
+* OIDC client secrets
+* SMTP passwords
+* Blockchain RPC credentials
+* Other deployment secrets
+
+Use secure values for all password and secret parameters in `.env.config`.
+
+Generated service-specific `.env.*` files should also be treated as sensitive configuration.
+
+---
+
+## Module documentation
+
+For detailed configuration and deployment instructions, see:
+
+* [Dataspace Operator README](./dataspace-operator/README.md)
+* [Participant README](./participant/README.md)
+
+---
