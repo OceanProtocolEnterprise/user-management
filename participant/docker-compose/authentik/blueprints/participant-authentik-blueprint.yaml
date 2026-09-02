@@ -639,8 +639,8 @@ entries:
       authentication_flow: !Find [authentik_flows.flow, [slug, oe-authentication-flow]]
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, oe-app-invalidation-flow]]
-      client_id: r4p8cxetzjgx1w2iwc0w115006i16mil
-      client_secret: CyHviqhKFkz0wPPwZaNM7ldefB8hKbK1qufz-hWh1LX
+      client_id: <your-client_id>
+      client_secret: <your_client_secret>
       client_type: confidential
       grant_types:
         - authorization_code
