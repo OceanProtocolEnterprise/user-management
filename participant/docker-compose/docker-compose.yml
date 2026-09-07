@@ -101,7 +101,8 @@ services:
       - "docker-host:host-gateway"
 
     ports:
-      - "${AUTHENTIK_PORT_HTTPS:-9443}:9443"
+      - "${COMPOSE_PORT_HTTPS:-9443}:${AUTHENTIK_PORT_HTTPS:-9443}"
+      - "${COMPOSE_PORT_HTTP:-9000}:${AUTHENTIK_PORT_HTTP:-9000}"
 
     volumes:
       - ./authentik/data:/data
