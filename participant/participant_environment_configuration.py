@@ -63,6 +63,9 @@ REQUIRED_VARS = [
     "AUTHENTIK_POSTGRESQL__PASSWORD",
     "AUTHENTIK_SECRET_KEY",
     "NODE_URI_MAP",
+    "OPENBAO_HOST_PORT",
+    "WALLET_UI_HOST_PORT",
+    "WALLET_API_HOST_PORT",
 ]
 
 def sanitize_url(url: str) -> str:
@@ -432,7 +435,6 @@ def main():
         "AUTHENTIK_PORT_HTTPS": DEFAULTS_PARTICIPANT["AUTHENTIK_PORT_HTTPS"],
         "AUTHENTIK_POSTGRESQL__NAME": DEFAULTS_PARTICIPANT["AUTHENTIK_POSTGRESQL__NAME"],
         "AUTHENTIK_POSTGRESQL__USER": DEFAULTS_PARTICIPANT["AUTHENTIK_POSTGRESQL__USER"],
-        "SMTP_HOST": DEFAULTS_PARTICIPANT["SMTP_HOST"],
         "AUTHENTIK_EMAIL__USE_SSL": DEFAULTS_PARTICIPANT["AUTHENTIK_EMAIL__USE_SSL"],
         "AUTHENTIK_EMAIL__TIMEOUT": DEFAULTS_PARTICIPANT["AUTHENTIK_EMAIL__TIMEOUT"],
         "AUTHENTIK_POSTGRESQL__HOST": DEFAULTS_PARTICIPANT["AUTHENTIK_POSTGRESQL__HOST"],
@@ -465,7 +467,9 @@ def main():
     )
     
     print("  Processing .env.openbao...")
-    openbao_vars = {}
+    openbao_vars = {
+        "OPENBAO_HOST_PORT": config['OPENBAO_HOST_PORT'],
+    }
     openbao_sections = [
         ("Configurable (sourced from .env.config)", openbao_vars),
     ]
@@ -565,12 +569,12 @@ def main():
         "WALLET_BACKEND_PORT": DEFAULTS_PARTICIPANT["WALLET_BACKEND_PORT"],
         "DB_NAME": DEFAULTS_PARTICIPANT["DB_NAME"],
         "DB_USERNAME": DEFAULTS_PARTICIPANT["DB_USERNAME"],
-        "DATABASE_ENGINE": DEFAULTS_PARTICIPANT["DATABASE_ENGINE"],
         "POSTGRES_DB_PORT": DEFAULTS_PARTICIPANT["POSTGRES_DB_PORT"],
         "POSTGRES_DB_HOST": DEFAULTS_PARTICIPANT["POSTGRES_DB_HOST"],
         "POSTGRES_DB_DATA": DEFAULTS_PARTICIPANT["POSTGRES_DB_DATA"],
         "WALLET_API_HOST": urlparse(config["WALLET_API_URL"]).hostname,
-        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
+        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
+        "WALLET_API_HOST_PORT": config['WALLET_API_HOST_PORT'],
     }
     
     db_password = config['DB_PASSWORD']
@@ -578,7 +582,7 @@ def main():
     
     wallet_api_sections = [
         ("Configurable (sourced from .env.config)", {k: wallet_api_vars[k] for k in [
-                    "DB_PASSWORD"
+                    "DB_PASSWORD", "WALLET_API_HOST_PORT"
                 ]}),
         ("Generated", {k: wallet_api_vars[k] for k in [
                     "WALLET_API_HOST",
@@ -587,7 +591,8 @@ def main():
         ("Default", {k: v for k, v in wallet_api_vars.items() if k not in [
             "WALLET_API_HOST",
             "WALLET_UI_HOST",
-            "DB_PASSWORD"
+            "DB_PASSWORD",
+            "WALLET_API_HOST_PORT"
         ]}),
     ]
     ensure_env_file_structure(
@@ -607,10 +612,10 @@ def main():
         "NUXT_PUBLIC_ISSUER_CALLBACK_URL": config['WALLET_UI_URL'],
         "NUXT_PUBLIC_DEV_WALLET_URL": config['WALLET_UI_URL'],
         "SERVICE_HOST": DEFAULTS_PARTICIPANT["SERVICE_HOST"],
-        "DATABASE_ENGINE": DEFAULTS_PARTICIPANT["DATABASE_ENGINE"],
         "NUXT_WALLET_API_INTERNAL": DEFAULTS_PARTICIPANT["NUXT_WALLET_API_INTERNAL"],
         "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
-        "NUXT_ADMIN_USER_GROUP_NAME": config["NUXT_ADMIN_USER_GROUP_NAME"]
+        "NUXT_ADMIN_USER_GROUP_NAME": config["NUXT_ADMIN_USER_GROUP_NAME"],
+        "WALLET_UI_HOST_PORT": config['WALLET_UI_HOST_PORT'],
     }
     wallet_ui_sections = [
         ("Configurable (sourced from .env.config)", {k: wallet_ui_vars[k] for k in [
@@ -622,9 +627,10 @@ def main():
             "NUXT_PUBLIC_ISSUER_CALLBACK_URL",
             "NUXT_PUBLIC_DEV_WALLET_URL",
             "WALLET_UI_HOST",
+            "WALLET_UI_HOST_PORT",
         ]}),
         ("Default", {k: wallet_ui_vars[k] for k in [
-            "SERVICE_HOST", "DATABASE_ENGINE", "NUXT_WALLET_API_INTERNAL"
+            "SERVICE_HOST", "NUXT_WALLET_API_INTERNAL"
         ]}),
     ]
     ensure_env_file_structure(
@@ -636,7 +642,10 @@ def main():
     print("  Processing .env for root docker compose deployment...")
     env_vars = {
         "WALLET_API_HOST": urlparse(config["WALLET_API_URL"]).hostname,
-        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
+        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
+        "WALLET_API_HOST_PORT": config['WALLET_API_HOST_PORT'],
+        "WALLET_UI_HOST_PORT": config['WALLET_UI_HOST_PORT'],
+        "OPENBAO_HOST_PORT": config['OPENBAO_HOST_PORT'],
     }
 
     append_new_env_vars(

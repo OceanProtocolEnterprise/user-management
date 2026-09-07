@@ -58,6 +58,9 @@ REQUIRED_VARS = [
     "AUTHENTIK_PROVIDER_NAME",
     "AUTHENTIK_POSTGRESQL__PASSWORD",
     "AUTHENTIK_SECRET_KEY",
+    "OPENBAO_HOST_PORT",
+    "WALLET_UI_HOST_PORT",
+    "WALLET_API_HOST_PORT",
 ]
 
 def sanitize_url(url: str) -> str:
@@ -399,7 +402,6 @@ def main():
         "AUTHENTIK_PORT_HTTPS": DEFAULTS_OPERATOR["AUTHENTIK_PORT_HTTPS"],
         "AUTHENTIK_POSTGRESQL__NAME": DEFAULTS_OPERATOR["AUTHENTIK_POSTGRESQL__NAME"],
         "AUTHENTIK_POSTGRESQL__USER": DEFAULTS_OPERATOR["AUTHENTIK_POSTGRESQL__USER"],
-        "SMTP_HOST": DEFAULTS_OPERATOR["SMTP_HOST"],
         "AUTHENTIK_EMAIL__USE_SSL": DEFAULTS_OPERATOR["AUTHENTIK_EMAIL__USE_SSL"],
         "AUTHENTIK_EMAIL__TIMEOUT": DEFAULTS_OPERATOR["AUTHENTIK_EMAIL__TIMEOUT"],
         "AUTHENTIK_POSTGRESQL__HOST": DEFAULTS_OPERATOR["AUTHENTIK_POSTGRESQL__HOST"],
@@ -426,7 +428,9 @@ def main():
     )
     
     print("  Processing .env.openbao...")
-    openbao_vars = {}
+    openbao_vars = {
+        "OPENBAO_HOST_PORT": config['OPENBAO_HOST_PORT'],
+    }
     openbao_sections = [
         ("Configurable (sourced from .env.config)", openbao_vars),
     ]
@@ -526,12 +530,12 @@ def main():
         "WALLET_BACKEND_PORT": DEFAULTS_OPERATOR["WALLET_BACKEND_PORT"],
         "DB_NAME": DEFAULTS_OPERATOR["DB_NAME"],
         "DB_USERNAME": DEFAULTS_OPERATOR["DB_USERNAME"],
-        "DATABASE_ENGINE": DEFAULTS_OPERATOR["DATABASE_ENGINE"],
         "POSTGRES_DB_PORT": DEFAULTS_OPERATOR["POSTGRES_DB_PORT"],
         "POSTGRES_DB_HOST": DEFAULTS_OPERATOR["POSTGRES_DB_HOST"],
         "POSTGRES_DB_DATA": DEFAULTS_OPERATOR["POSTGRES_DB_DATA"],
         "WALLET_API_HOST": urlparse(config["WALLET_API_URL"]).hostname,
-        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
+        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
+        "WALLET_API_HOST_PORT": config['WALLET_API_HOST_PORT'],
     }
     
     db_password = config['DB_PASSWORD']
@@ -539,7 +543,7 @@ def main():
     
     wallet_api_sections = [
             ("Configurable (sourced from .env.config)", {k: wallet_api_vars[k] for k in [
-                    "DB_PASSWORD"
+                    "DB_PASSWORD", "WALLET_API_HOST_PORT"
             ]}),
             ("Generated", {k: wallet_api_vars[k] for k in [
                         "WALLET_API_HOST",
@@ -548,7 +552,8 @@ def main():
             ("Default", {k: v for k, v in wallet_api_vars.items() if k not in [
                 "WALLET_API_HOST",
                 "WALLET_UI_HOST",
-                "DB_PASSWORD"
+                "DB_PASSWORD",
+                "WALLET_API_HOST_PORT"
             ]}),
     ]
     ensure_env_file_structure(
@@ -575,12 +580,12 @@ def main():
         "NUXT_PUBLIC_CLIENT_ID": client_id,
         "NUXT_PUBLIC_ISSUER": issuer,
         "NUXT_CLIENT_SECRET": client_secret,
-        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
+        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
+        "WALLET_UI_HOST_PORT": config['WALLET_UI_HOST_PORT'],
     }
     
     wallet_ui_defaults = {
         "SERVICE_HOST": DEFAULTS_OPERATOR["SERVICE_HOST"],
-        "DATABASE_ENGINE": DEFAULTS_OPERATOR["DATABASE_ENGINE"],
         "DEV_WALLET_FRONTEND_PORT": DEFAULTS_OPERATOR["DEV_WALLET_FRONTEND_PORT"],
         "DEMO_WALLET_FRONTEND_PORT": DEFAULTS_OPERATOR["DEMO_WALLET_FRONTEND_PORT"],
         "NUXT_WALLET_API_INTERNAL": DEFAULTS_OPERATOR["NUXT_WALLET_API_INTERNAL"],
@@ -601,7 +606,10 @@ def main():
     print("  Processing .env for root docker compose deployment...")
     env_vars = {
         "WALLET_API_HOST": urlparse(config["WALLET_API_URL"]).hostname,
-        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname
+        "WALLET_UI_HOST": urlparse(config["WALLET_UI_URL"]).hostname,
+        "WALLET_API_HOST_PORT": config['WALLET_API_HOST_PORT'],
+        "WALLET_UI_HOST_PORT": config['WALLET_UI_HOST_PORT'],
+        "OPENBAO_HOST_PORT": config['OPENBAO_HOST_PORT'],
     }
 
     append_new_env_vars(
