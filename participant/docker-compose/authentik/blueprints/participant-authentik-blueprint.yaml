@@ -1,0 +1,695 @@
+version: 1
+metadata:
+  name: Custom authentik Configuration - vm1-test-federated-app
+  labels:
+    blueprints.goauthentik.io/generated: 'false'
+entries:
+  - model: authentik_crypto.certificatekeypair
+    identifiers:
+      name: vm1-test.oceanenterprise.io
+    state: present
+  - model: authentik_brands.brand
+    identifiers:
+      domain: authentik-default
+    attrs:
+      web_certificate: !Find [authentik_crypto.certificatekeypair, [name,
+        vm1-test.oceanenterprise.io]]
+      client_certificates:
+        - !Find [authentik_crypto.certificatekeypair, [name, vm1-test.oceanenterprise.io]]
+    state: present
+  - model: authentik_flows.flow
+    identifiers:
+      slug: oe-app-auth-flow
+    attrs:
+      name: Application Authorization Flow
+      title: Authorize Application
+      designation: authorization
+      authentication: none
+      policy_engine_mode: any
+      compatibility_mode: false
+      denied_action: message_continue
+      layout: stacked
+    state: present
+  - model: authentik_flows.flow
+    identifiers:
+      slug: oe-app-invalidation-flow
+    attrs:
+      name: Application Invalidation Flow
+      title: Invalidate Session
+      designation: invalidation
+      authentication: none
+      policy_engine_mode: any
+      compatibility_mode: false
+      denied_action: message_continue
+      layout: stacked
+    state: present
+  - model: authentik_flows.flow
+    identifiers:
+      slug: oe-enrollment-invitation
+    attrs:
+      name: oe-enrollment-invitation
+      title: Enrollment Invitation
+      designation: enrollment
+      authentication: none
+      policy_engine_mode: any
+      compatibility_mode: true
+      denied_action: message_continue
+      layout: stacked
+    state: present
+  - model: authentik_flows.flow
+    identifiers:
+      slug: oe-recovery
+    attrs:
+      name: oe-recovery
+      title: Recovery
+      designation: recovery
+      authentication: none
+      policy_engine_mode: any
+      compatibility_mode: false
+      denied_action: message_continue
+      layout: stacked
+      background: ''
+    state: present
+  - model: authentik_flows.flow
+    identifiers:
+      slug: oe-authentication-flow
+    attrs:
+      name: Custom Authentication Flow
+      title: Welcome to authentik!
+      designation: authentication
+      authentication: none
+      policy_engine_mode: any
+      compatibility_mode: false
+      denied_action: message_continue
+      layout: stacked
+      background: ''
+    state: present
+  - model: authentik_stages_redirect.redirectstage
+    identifiers:
+      name: oe-redirect-logout-stage
+    attrs:
+      mode: static
+      target_static: https://market-git-feat-fix-logout-v1-ocean-enterprise.vercel.app/auth/callback/logout
+      keep_context: true
+    state: present
+  - model: authentik_stages_user_write.userwritestage
+    identifiers:
+      name: oe-enrollment-invitation-write
+    attrs:
+      create_users_as_inactive: false
+      create_users_group:
+      user_creation_mode: create_when_required
+      user_path_template: ''
+      user_type: internal
+    state: present
+  - model: authentik_stages_invitation.invitationstage
+    identifiers:
+      name: oe-enrollment-invitation
+    attrs:
+      continue_flow_without_invitation: false
+    state: present
+  - model: authentik_stages_deny.denystage
+    identifiers:
+      name: oe-user-email-check-deny
+    attrs:
+      deny_message: Email already exists! Contact admin.
+    state: present
+  - model: authentik_stages_deny.denystage
+    identifiers:
+      name: oe-user-username-check-deny
+    attrs:
+      deny_message: Username already exists! Try another one.
+    state: present
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: oe-recovery-authentication-identification
+    attrs:
+      name: oe-recovery-authentication-identification
+      user_fields:
+        - username
+        - email
+      password_stage:
+      captcha_stage:
+      case_insensitive_matching: true
+      pretend_user_exists: true
+      show_matched_user: true
+      show_source_labels: false
+      sources: []
+      enable_remember_me: false
+      enrollment_flow:
+      passwordless_flow:
+      recovery_flow:
+      webauthn_stage:
+    state: present
+  - model: authentik_stages_email.emailstage
+    identifiers:
+      name: oe-recovery-email
+    attrs:
+      name: oe-recovery-email
+      activate_user_on_success: true
+      use_global_settings: false
+      token_expiry: minutes=30
+      subject: Password Recovery
+      template: email/password_reset.html
+      recovery_max_attempts: 5
+      recovery_cache_timeout: minutes=5
+      from_address: support@oceanenterprise.io
+      host: mail.gandi.net
+      port: 587
+      username: support@oceanenterprise.io
+      password: cTaDFot1SvzHk7#
+      timeout: 10
+      use_ssl: false
+      use_tls: false
+    state: present
+  - model: authentik_stages_user_write.userwritestage
+    identifiers:
+      name: default-password-change-write
+    attrs:
+      name: default-password-change-write
+      user_creation_mode: never_create
+      create_users_as_inactive: false
+      user_type: external
+      create_users_group:
+      user_path_template: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: oe-orgId
+    attrs:
+      field_key: orgId
+      label: Organization ID
+      type: dropdown
+      required: true
+      placeholder: "return [\n    {\"label\": \"ocean_enterprise\", \"value\": \"\
+        ocean_enterprise\"},\n    {\"label\": \"delta_dao\", \"value\": \"delta_dao\"\
+        },\n    {\"label\": \"other_org\", \"value\": \"other_org\"},\n]"
+      placeholder_expression: true
+      initial_value: ''
+      initial_value_expression: false
+      order: 100
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: default-source-enrollment-field-username
+    attrs:
+      field_key: username
+      label: Username
+      type: text
+      required: true
+      order: 101
+      placeholder: Username
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: default-user-settings-field-name
+    attrs:
+      field_key: name
+      label: Name
+      type: text
+      required: true
+      order: 200
+      placeholder: Full name
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: initial-setup-field-password
+    attrs:
+      field_key: password
+      label: Password
+      type: password
+      required: true
+      order: 300
+      placeholder: Password
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: initial-setup-field-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: Password (repeat)
+      type: password
+      required: true
+      order: 301
+      placeholder: Password (repeat)
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: default-password-change-field-password
+    attrs:
+      field_key: password
+      label: Password
+      type: password
+      required: true
+      order: 300
+      placeholder: Password
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_stages_prompt.prompt
+    identifiers:
+      name: default-password-change-field-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: Password (repeat)
+      type: password
+      required: true
+      order: 301
+      placeholder: Password (repeat)
+      placeholder_expression: false
+      initial_value: ''
+      initial_value_expression: false
+      sub_text: ''
+    state: present
+  - model: authentik_policies_password.passwordpolicy
+    identifiers:
+      name: default-password-change-password-policy
+    attrs:
+      name: default-password-change-password-policy
+      password_field: password
+      length_min: 8
+      amount_uppercase: 0
+      amount_lowercase: 0
+      amount_digits: 0
+      amount_symbols: 0
+      symbol_charset: "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~ "
+      error_message: Password needs to be 8 characters or longer.
+      check_static_rules: true
+      check_zxcvbn: true
+      zxcvbn_score_threshold: 2
+      check_have_i_been_pwned: false
+      hibp_allowed_count: 0
+    state: present
+  - model: authentik_stages_prompt.promptstage
+    identifiers:
+      name: default-password-change-prompt
+    attrs:
+      name: default-password-change-prompt
+      fields:
+        - !Find [authentik_stages_prompt.prompt, [name, default-password-change-field-password]]
+        - !Find [authentik_stages_prompt.prompt, [name, default-password-change-field-password-repeat]]
+      validation_policies:
+        - !Find [authentik_policies_password.passwordpolicy, [name, default-password-change-password-policy]]
+    state: present
+  - model: authentik_stages_prompt.promptstage
+    identifiers:
+      name: default-source-enrollment-prompt
+    attrs:
+      fields:
+        - !Find [authentik_stages_prompt.prompt, [name, default-source-enrollment-field-username]]
+        - !Find [authentik_stages_prompt.prompt, [name, default-user-settings-field-name]]
+        - !Find [authentik_stages_prompt.prompt, [name, initial-setup-field-password]]
+        - !Find [authentik_stages_prompt.prompt, [name, initial-setup-field-password-repeat]]
+      validation_policies: []
+    state: present
+  - model: authentik_stages_identification.identificationstage
+    identifiers:
+      name: oe-authentication-identification
+    attrs:
+      name: oe-authentication-identification
+      user_fields:
+        - username
+        - email
+      password_stage: !Find [authentik_stages_password.passwordstage, [name,
+        default-authentication-password]]
+      captcha_stage:
+      case_insensitive_matching: true
+      pretend_user_exists: true
+      show_matched_user: true
+      show_source_labels: false
+      sources: []
+      enable_remember_me: false
+      enrollment_flow:
+      passwordless_flow:
+      recovery_flow: !Find [authentik_flows.flow, [slug, oe-recovery]]
+      webauthn_stage:
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 0
+      stage: !Find [authentik_stages_identification.identificationstage, [name,
+        oe-authentication-identification]]
+      target: !Find [authentik_flows.flow, [slug, oe-authentication-flow]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 10
+      stage: !Find [authentik_stages_authenticator_validate.authenticatorvalidatestage,
+        [name, default-authentication-mfa-validation]]
+      target: !Find [authentik_flows.flow, [slug, oe-authentication-flow]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 20
+      stage: !Find [authentik_stages_user_login.userloginstage, [name, default-authentication-login]]
+      target: !Find [authentik_flows.flow, [slug, oe-authentication-flow]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_providers_oauth2.scopemapping
+    identifiers:
+      name: oe-organizationId
+    attrs:
+      scope_name: oe-organizationId
+      description: used to gain organization Id claim
+      expression: "return {\n    \"orgId\": request.user.attributes.get(\"orgId\"\
+        , \"\")\n}"
+    state: present
+  - model: authentik_providers_oauth2.scopemapping
+    identifiers:
+      name: oe-signerServer
+    attrs:
+      scope_name: oe-signerServer
+      description: Used to claim signer server url
+      expression: "return {\n    \"signerServer\": request.user.attributes.get(\"\
+        signerServer\", \"\")\n}"
+    state: present
+  - model: authentik_providers_oauth2.scopemapping
+    identifiers:
+      name: oe-wellKnownUrl
+    attrs:
+      scope_name: oe-wellKnownUrl
+      description: Used to claim well-known url
+      expression: "return {\n    \"wellKnownUrl\": request.user.attributes.get(\"\
+        wellKnownUrl\", \"\")\n}"
+    state: present
+  - model: authentik_providers_oauth2.scopemapping
+    identifiers:
+      name: oe-walletId
+    attrs:
+      scope_name: oe-walletId
+      description: Used to claim wallet id
+      expression: "return {\n    \"walletId\": request.user.attributes.get(\"walletId\"\
+        , \"\")\n}"
+    state: present
+  - model: authentik_policies_expression.expressionpolicy
+    identifiers:
+      name: oe-save-user-attributes
+    attrs:
+      execution_logging: true
+      expression: "org = context.get(\"prompt_data\", {}).get(\"orgId\")\nwallet_id
+        = context.get(\"prompt_data\", {}).get(\"walletId\")\nsigner_server = context.get(\"\
+        prompt_data\", {}).get(\"signerServer\")\nwell_known_url = context.get(\"\
+        prompt_data\", {}).get(\"wellKnownUrl\")\n\nuser = context.get(\"pending_user\"\
+        )\n\nif user:\n    if org:\n        user.attributes[\"orgId\"] = org\n   \
+        \ \n    if wallet_id:\n        user.attributes[\"walletId\"] = wallet_id\n\
+        \    \n    if signer_server:\n        user.attributes[\"signerServer\"] =
+        signer_server\n    \n    if well_known_url:\n        user.attributes[\"wellKnownUrl\"\
+        ] = well_known_url\n    \n    user.save()\n\nreturn True"
+    state: present
+  - model: authentik_policies_expression.expressionpolicy
+    identifiers:
+      name: oe-check-email-exist-policy
+    attrs:
+      execution_logging: true
+      expression: "from authentik.core.models import User\nfrom django.core.mail import
+        send_mail\nfrom django.conf import settings\n\nemail = request.context.get(\"\
+        prompt_data\", {}).get(\"email\")\n\nif not email:\n    return False\n\nexists
+        = User.objects.filter(email__iexact=email).exists()\n\nif exists:\n    send_mail(\n\
+        \        subject=\"Invitation attempted for existing user\",\n        message=(\n\
+        \            f\"An invitation was created for '{email}', \"\n            \"\
+        but a user with this email already exists.\"\n        ),\n        from_email=settings.DEFAULT_FROM_EMAIL,\n\
+        \        recipient_list=[\"support@oceanenterprise.io\"],\n        fail_silently=False,\n\
+        \    )\n\nreturn exists"
+    state: present
+  - model: authentik_policies_expression.expressionpolicy
+    identifiers:
+      name: oe-check-username-exist-policy
+    attrs:
+      execution_logging: true
+      expression: "from authentik.core.models import User\n\nusername = request.context.get(\"\
+        prompt_data\", {}).get(\"username\")\n\nif not username:\n    return False\n\
+        \nexists = User.objects.filter(username__iexact=username).exists()\n\nreturn
+        exists"
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 10
+      stage: !Find [authentik_stages_invitation.invitationstage, [name, oe-enrollment-invitation]]
+      target: !Find [authentik_flows.flow, [slug, oe-enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    id: oe-email-check-binding
+    identifiers:
+      order: 15
+      stage: !Find [authentik_stages_deny.denystage, [name, oe-user-email-check-deny]]
+      target: !Find [authentik_flows.flow, [slug, oe-enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 20
+      stage: !Find [authentik_stages_prompt.promptstage, [name, default-source-enrollment-prompt]]
+      target: !Find [authentik_flows.flow, [slug, oe-enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    id: oe-username-check-binding
+    identifiers:
+      order: 25
+      stage: !Find [authentik_stages_deny.denystage, [name, oe-user-username-check-deny]]
+      target: !Find [authentik_flows.flow, [slug, oe-enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 30
+      stage: !Find [authentik_stages_user_write.userwritestage, [name, oe-enrollment-invitation-write]]
+      target: !Find [authentik_flows.flow, [slug, oe-enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    id: oe-local-flow-binding
+    identifiers:
+      order: 40
+      stage: !Find [authentik_stages_redirect.redirectstage, [name, oe-redirect-logout-stage]]
+      target: !Find [authentik_flows.flow, [slug, oe-enrollment-invitation]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 0
+      stage: !Find [authentik_stages_identification.identificationstage, [name,
+        oe-recovery-authentication-identification]]
+      target: !Find [authentik_flows.flow, [slug, oe-recovery]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 10
+      stage: !Find [authentik_stages_email.emailstage, [name, oe-recovery-email]]
+      target: !Find [authentik_flows.flow, [slug, oe-recovery]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 20
+      stage: !Find [authentik_stages_prompt.promptstage, [name, default-password-change-prompt]]
+      target: !Find [authentik_flows.flow, [slug, oe-recovery]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 30
+      stage: !Find [authentik_stages_user_write.userwritestage, [name, default-password-change-write]]
+      target: !Find [authentik_flows.flow, [slug, oe-recovery]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name,
+        oe-save-user-attributes]]
+      target: !KeyOf oe-local-flow-binding
+    attrs:
+      enabled: true
+      failure_result: false
+      group:
+      negate: false
+      timeout: 30
+      user:
+    state: present
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name,
+        oe-check-email-exist-policy]]
+      target: !KeyOf oe-email-check-binding
+    attrs:
+      enabled: true
+      failure_result: false
+      group:
+      negate: false
+      timeout: 30
+      user:
+    state: present
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      policy: !Find [authentik_policies_expression.expressionpolicy, [name,
+        oe-check-username-exist-policy]]
+      target: !KeyOf oe-username-check-binding
+    attrs:
+      enabled: true
+      failure_result: false
+      group:
+      negate: false
+      timeout: 30
+      user:
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 10
+      stage: !Find [authentik_stages_user_logout.userlogoutstage, [name, default-invalidation-logout]]
+      target: !Find [authentik_flows.flow, [slug, oe-app-invalidation-flow]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      order: 20
+      stage: !Find [authentik_stages_redirect.redirectstage, [name, oe-redirect-logout-stage]]
+      target: !Find [authentik_flows.flow, [slug, oe-app-invalidation-flow]]
+    attrs:
+      evaluate_on_plan: false
+      invalid_response_action: retry
+      policy_engine_mode: any
+      re_evaluate_policies: true
+    state: present
+  - model: authentik_providers_oauth2.oauth2provider
+    identifiers:
+      name: vm1-test-federated-provider
+    attrs:
+      name: vm1-test-federated-provider
+      authentication_flow: !Find [authentik_flows.flow, [slug, oe-authentication-flow]]
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, oe-app-invalidation-flow]]
+      client_id: <your-client_id>
+      client_secret: <your_client_secret>
+      client_type: confidential
+      grant_types:
+        - authorization_code
+        - implicit
+        - hybrid
+        - refresh_token
+        - client_credentials
+        - password
+        - urn:ietf:params:oauth:grant-type:device_code
+      access_code_validity: minutes=1
+      access_token_validity: hours=1
+      refresh_token_validity: days=30
+      refresh_token_threshold: hours=1
+      include_claims_in_id_token: true
+      issuer_mode: per_provider
+      logout_method: backchannel
+      logout_uri: https://market-git-feat-fix-logout-v1-ocean-enterprise.vercel.app/auth/callback/logout
+      backchannel_logout_enabled: true
+      sub_mode: hashed_user_id
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, oe-organizationId]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, oe-signerServer]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, oe-wellKnownUrl]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, oe-walletId]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, offline_access]]
+      redirect_uris:
+        - matching_mode: strict
+          redirect_uri_type: authorization
+          url: https://market-git-feat-fix-logout-v1-ocean-enterprise.vercel.app/auth/callback
+        - matching_mode: strict
+          redirect_uri_type: authorization
+          url: https://market-git-feat-fix-logout-v1-ocean-enterprise.vercel.app/auth/login
+        - matching_mode: strict
+          redirect_uri_type: authorization
+          url: https://ocean-node-vm1-stage.oceanenterprise.io:9443/source/oauth/callback/vm1-test-federated-app/
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, vm1-test.oceanenterprise.io]]
+    state: present
+  - model: authentik_core.application
+    identifiers:
+      slug: vm1-test-federated-app
+    attrs:
+      name: vm1-test-federated-app
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, vm1-test-federated-provider]]
+      policy_engine_mode: any
+      meta_description: ''
+      meta_icon: ''
+      meta_launch_url: ''
+      open_in_new_tab: false
+    state: present

@@ -1,0 +1,283 @@
+services:
+  wallet-api:
+    image: waltid/wallet-api:${WALLET_API_TAG:?}
+    pull_policy: missing
+    restart: unless-stopped
+    container_name: wallet-api
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+
+    env_file:
+      - path: ./wallet-api/.env.wallet-api
+
+    extra_hosts:
+      - "${SERVICE_HOST}:host-gateway"
+      - "waltid.enterprise.localhost:host-gateway"
+
+    volumes:
+      - ./wallet-api/config:/waltid-wallet-api/config
+      - ./wallet-api/data:/waltid-wallet-api/data
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wallet-api-public.entrypoints=websecure"
+      - "traefik.http.routers.wallet-api-public.rule=Host(`${WALLET_API_HOST}`)"
+      - "traefik.http.routers.wallet-api-public.tls=true"
+      - "traefik.http.routers.wallet-api-public.service=wallet-api-svc"
+      - "traefik.http.services.wallet-api-svc.loadbalancer.server.port=${WALLET_BACKEND_PORT}"
+      - "traefik.http.routers.wallet-api-ui-path.entrypoints=websecure"
+      - "traefik.http.routers.wallet-api-ui-path.rule=Host(`${WALLET_UI_HOST}`) && PathPrefix(`/wallet-api/`)"
+      - "traefik.http.routers.wallet-api-ui-path.priority=100"
+      - "traefik.http.routers.wallet-api-ui-path.tls=true"
+      - "traefik.http.routers.wallet-api-ui-path.service=wallet-api-svc"
+
+  wallet-ui:
+    image: oceanenterprise/waltid-dev-wallet:${DEV_WALLET_TAG:?}
+    pull_policy: missing
+    restart: unless-stopped
+    container_name: wallet-ui
+
+    depends_on:
+      - wallet-api
+      - traefik
+
+    env_file:
+      - path: ./wallet-ui/.env.wallet-ui
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.waltid-dev-wallet-public.entrypoints=websecure"
+      - "traefik.http.routers.waltid-dev-wallet-public.rule=Host(`${WALLET_UI_HOST}`)"
+      - "traefik.http.routers.waltid-dev-wallet-public.priority=1"
+      - "traefik.http.routers.waltid-dev-wallet-public.tls=true"
+      - "traefik.http.routers.waltid-dev-wallet-public.service=waltid-dev-wallet-svc"
+      - "traefik.http.services.waltid-dev-wallet-svc.loadbalancer.server.port=${NITRO_PORT}"
+
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    restart: always
+
+    env_file:
+      - path: ./postgres-init/.env.postgres
+
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -q
+        - -U
+        - "postgres"
+      interval: 5s
+      timeout: 1s
+      retries: 5
+
+    volumes:
+      - postgresql-data:/var/lib/postgresql
+      - ./postgres-init/create-authentik-db.sh:/docker-entrypoint-initdb.d/10-create-authentik-db.sh:ro
+
+  authentik-server:
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:?}
+    pull_policy: missing
+    container_name: authentik-server
+    command: server
+    restart: unless-stopped
+    shm_size: 512mb
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+
+    env_file:
+      - path: ./authentik/.env.authentik
+
+    extra_hosts:
+      - "docker-host:host-gateway"
+
+    ports:
+      - "${COMPOSE_PORT_HTTPS:-9443}:${AUTHENTIK_PORT_HTTPS:-9443}"
+
+    volumes:
+      - ./authentik/data:/data
+      - ./authentik/custom-templates:/templates
+      - ./authentik/blueprints:/blueprints/custom:ro
+      - ./authentik/certs:/certs
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik-http.entrypoints=authentik-http"
+      - "traefik.http.routers.authentik-http.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.authentik-http.service=authentik-http-svc"
+      - "traefik.http.services.authentik-http-svc.loadbalancer.server.port=9000"
+
+  authentik-worker:
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:?}
+    pull_policy: missing
+    container_name: authentik-worker
+    command: worker
+    restart: unless-stopped
+    shm_size: 512mb
+    user: root
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    env_file:
+      - path: ./authentik/.env.authentik
+
+    extra_hosts:
+      - "docker-host:host-gateway"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./authentik/data:/data
+      - ./authentik/certs:/certs
+      - ./authentik/custom-templates:/templates
+      - ./authentik/blueprints:/blueprints/custom:ro
+
+  openbao:
+    build:
+      context: ./openbao
+      dockerfile: Dockerfile
+
+    container_name: openbao
+    restart: unless-stopped
+
+    environment:
+      PRIVATE_KEYS_FILE: /run/secrets/private_keys
+      PERSISTENT_PRIVATE_KEYS_FILE: /run/secrets/private_keys
+
+      # To use your own TLS certificate instead of the auto-generated
+      # self-signed certificate, configure these paths inside the container.
+      TLS_CERT_SOURCE: /etc/openbao/certs/tls.crt
+      TLS_KEY_SOURCE: /etc/openbao/certs/tls.key
+
+    volumes:
+      - openbao-data:/bao/data
+      - openbao-keys:/vault/keys
+      - ./openbao/secrets/private_keys:/run/secrets/private_keys
+      - ./openbao/certs:/etc/openbao/certs:ro
+
+    healthcheck:
+      test:
+        - CMD
+        - bao
+        - status
+        - -tls-skip-verify
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  signer-server:
+    image: oceanenterprise/signer-server:${SIGNER_SERVER_TAG:?}
+    pull_policy: missing
+    container_name: signer-server
+    restart: unless-stopped
+
+    depends_on:
+      openbao:
+        condition: service_healthy
+
+    env_file:
+      - path: ./signer-server/.env.signer-server
+
+    volumes:
+      - openbao-keys:/vault/keys:ro
+      - ./signer-server/certs:/etc/ssl/certs:ro
+      - ./openbao/certs:/etc/openbao/certs:ro
+
+    command:
+      - sh
+      - -c
+      - |
+        echo "[signer-server] waiting for OpenBao TLS certificate..."
+        until [ -s /etc/openbao/certs/tls.crt ]; do
+          sleep 2
+        done
+
+        echo "[signer-server] waiting for OpenBao root token..."
+        until [ -s /vault/keys/root_token ]; do
+          sleep 2
+        done
+
+        export VAULT_TOKEN="$$(cat /vault/keys/root_token)"
+        export NODE_EXTRA_CA_CERTS=/etc/openbao/certs/tls.crt
+
+        echo "[signer-server] starting with VAULT_URL=$$VAULT_URL"
+        exec node dist/main.js
+
+    ports:
+      - target: 3001
+        published: "${SIGNER_SERVER_PORT:-8443}"
+        protocol: tcp
+      
+
+  traefik:
+    image: traefik:v3.7
+    container_name: traefik
+    restart: unless-stopped
+
+    env_file:
+      - path: ./traefik/.env.traefik
+
+    command:
+      - "--api.insecure=false"
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--ping=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.authentik-http.address=:${AUTHENTIK_PORT_HTTP:-9000}"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+
+    healthcheck:
+      test:
+        - CMD
+        - traefik
+        - healthcheck
+        - --ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+
+      - target: ${AUTHENTIK_PORT_HTTP:-9000}
+        published: ${AUTHENTIK_PORT_HTTP:-9000}
+        protocol: tcp
+        mode: host
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/certs:/certs:ro
+
+volumes:
+  postgresql-data:
+  openbao-data:
+  openbao-keys:
