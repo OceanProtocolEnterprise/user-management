@@ -665,6 +665,15 @@ def generate_blueprint(
         "state": "present"
     })
     
+    entries.append({
+        "model": "authentik_stages_deny.denystage",
+        "identifiers": {"name": "oe-check-user-is-admin-deny"},
+        "attrs": {
+            "deny_message": "Login Not Allowed, User belongs to Authentik Admin Group."
+        },
+        "state": "present"
+    })
+    
     # ================================================================
     # 2.5 RECOVERY FLOW STAGES
     # ================================================================
@@ -1108,6 +1117,16 @@ def generate_blueprint(
         "state": "present"
     })
     
+    entries.append({
+        "model": "authentik_policies_expression.expressionpolicy",
+        "identifiers": {"name": "oe-check-user-isAdmin"},
+        "attrs": {
+            "execution_logging": True,
+            "expression": 'flow_plan = context.get("flow_plan")\n\nif not flow_plan:\n    return False\n\nflow_context = flow_plan.context\n\nsource_groups = flow_context.get("source_groups", {})\n\nreturn "authentik Admins" in source_groups'
+        },
+        "state": "present"
+    })
+    
     # ================================================================
     # 7. FLOW STAGE BINDINGS FOR oe-recovery FLOW
     # ================================================================
@@ -1179,6 +1198,22 @@ def generate_blueprint(
     # ================================================================
     # 8. FLOW STAGE BINDINGS FOR oe-central-federated-jit-enrollment
     # ================================================================
+    
+    entries.append({
+        "model": "authentik_flows.flowstagebinding",
+        "identifiers": {
+            "order": 5,
+            "stage": "!FIND_MARKER:[authentik_stages_deny.denystage, [name, oe-check-user-is-admin-deny]]",
+            "target": "!FIND_MARKER:[authentik_flows.flow, [slug, oe-central-federated-jit-enrollment]]"
+        },
+        "attrs": {
+            "evaluate_on_plan": False,
+            "invalid_response_action": "retry",
+            "policy_engine_mode": "any",
+            "re_evaluate_policies": True
+        },
+        "state": "present"
+    })
     
     entries.append({
         "model": "authentik_flows.flowstagebinding",
@@ -1367,6 +1402,24 @@ def generate_blueprint(
             "failure_result": False,
             "group": None,
             "negate": False,
+            "timeout": 30,
+            "user": None
+        },
+        "state": "present"
+    })
+    
+    entries.append({
+        "model": "authentik_policies.policybinding",
+        "identifiers": {
+            "order": 0,
+            "policy": "!FIND_MARKER:[authentik_policies_expression.expressionpolicy, [name, oe-check-user-isAdmin]]",
+            "target": "!FIND_MARKER:[authentik_flows.flowstagebinding, [order, 5]]"
+        },
+        "attrs": {
+            "enabled": True,
+            "failure_result": False,
+            "group": None,
+            "negate": True,
             "timeout": 30,
             "user": None
         },
@@ -1600,6 +1653,7 @@ def main():
     print("    - oe-enrollment-invitation-write (User Write Stage)")
     print("    - oe-redirect-logout-stage (Redirect Stage)")
     print("  Federated JIT Enrollment Flow (oe-central-federated-jit-enrollment)")
+    print("    - oe-check-user-is-admin-deny (Deny Stage with admin check policy)")
     print("    - oe-central-create-jit-user (User Write Stage)")
     print("    - default-authentication-login (User Login Stage)")
     print("  OAuth Source Property Mapping: oe-central-federated-oidc-mapping")
@@ -1615,6 +1669,7 @@ def main():
     print("  oe-save-user-attributes Policy")
     print("  oe-check-email-exist-policy (with email notification to admin)")
     print("  oe-check-username-exist-policy")
+    print("  oe-check-user-isAdmin Policy")
     print("  oe-orgId Prompt")
     print("  All Flow Stage Bindings")
     print("  Policy Bindings with !KeyOf")
