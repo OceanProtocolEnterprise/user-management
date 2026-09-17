@@ -1419,7 +1419,7 @@ def generate_blueprint(
             "enabled": True,
             "failure_result": False,
             "group": None,
-            "negate": True,
+            "negate": False,
             "timeout": 30,
             "user": None
         },
