@@ -9,7 +9,7 @@ dataspace-operator/docker-compose/signer-server/.env.signer-server
 dataspace-operator/docker-compose/traefik/.env.traefik
 dataspace-operator/docker-compose/wallet-api/.env.wallet-api
 dataspace-operator/docker-compose/wallet-ui/.env.wallet-ui
-dataspace-operator/docker-compose/authentik/blueprints/*
+dataspace-operator/docker-compose/authentik/blueprints/dataspace-operator-authentik-blueprint.yaml
 participant/docker-compose/authentik/.env.authentik
 participant/docker-compose/openbao/.env.openbao
 participant/docker-compose/postgres-init/.env.postgres
@@ -17,4 +17,4 @@ participant/docker-compose/signer-server/.env.signer-server
 participant/docker-compose/traefik/.env.traefik
 participant/docker-compose/wallet-api/.env.wallet-api
 participant/docker-compose/wallet-ui/.env.wallet-ui
-participant/docker-compose/authentik/blueprints/*
+participant/docker-compose/authentik/blueprints/participant-authentik-blueprint.yaml
