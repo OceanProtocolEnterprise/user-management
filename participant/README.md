@@ -197,7 +197,9 @@ NUXT_ADMIN_USER_GROUP_NAME=""
 `NUXT_ADMIN_USER_GROUP_NAME` should contain the Authentik administrator group used to access the Wallet UI.
 
 #### Important Notes
-For wallet UI on Participant side granting access, user group from Participant Identity Provider Authentik must not have super user priviledges.
+- For wallet UI on Participant side granting access, user group from Participant Identity Provider Authentik must not have super user priviledges.
+
+- Super user (users within `authentik Admins` user group) authentication in Marketplace and wallet UI from Data Space Participant side is denied, please make sure that Participant users do not have super user privileges.
 
 ---
 
