@@ -416,7 +416,7 @@ def generate_blueprint(
     logout_uri = f"{marketplace_url}/auth/callback/logout"
     
     if custom_scopes is None:
-        custom_scopes = ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-walletId", "oe-central-federated_identity"]
+        custom_scopes = ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-ssiWalletApi", "oe-walletId", "oe-central-federated_identity"]
     
     admin_email = os.getenv("AUTHENTIK_EMAIL__FROM", "system@authentik.local")
 
@@ -1023,7 +1023,7 @@ def generate_blueprint(
         "identifiers": {"name": "oe-central-federated-oidc-mapping"},
         "attrs": {
             "name": "oe-central-federated-oidc-mapping",
-            "expression": 'return {\n    "username": info.get("preferred_username") or info.get("nickname") or info.get("sub"),\n    "email": info.get("email"),\n    "name": info.get("name") or info.get("given_name") or "Federated User",\n\n    "attributes": {\n        "upstream_idp": source.name if source else "unknown1",\n        "orgId": info.get("orgId", "unknown1"),\n        "walletId": info.get("walletId", "unknown1"),\n        "signerServer": info.get("signerServer", "unknown1"),\n        "wellKnownUrl": info.get("wellKnownUrl", "unknown1"),\n        "external_subject": info.get("sub"),\n        "idp_issuer": info.get("iss"),\n    },\n\n    "orgId": info.get("orgId", "unknown7"),\n    "walletId": info.get("walletId", "unknown7"),\n    "signerServer": info.get("signerServer", "unknown7"),\n    "wellKnownUrl": info.get("wellKnownUrl", "unknown7"),\n    "upstream_idp": source.name if source else "unknown7",\n    "external_subject": info.get("sub"),\n}'
+            "expression": 'return {\n    "username": info.get("preferred_username") or info.get("nickname") or info.get("sub"),\n    "email": info.get("email"),\n    "name": info.get("name") or info.get("given_name") or "Federated User",\n\n    "attributes": {\n        "upstream_idp": source.name if source else "unknown1",\n        "orgId": info.get("orgId", "unknown1"),\n        "walletId": info.get("walletId", "unknown1"),\n        "signerServer": info.get("signerServer", "unknown1"),\n        "wellKnownUrl": info.get("wellKnownUrl", "unknown1"),\n        "ssiWalletApi": info.get("ssiWalletApi", "unknown1"),\n        "external_subject": info.get("sub"),\n        "idp_issuer": info.get("iss"),\n    },\n\n    "orgId": info.get("orgId", "unknown7"),\n    "walletId": info.get("walletId", "unknown7"),\n    "signerServer": info.get("signerServer", "unknown7"),\n    "wellKnownUrl": info.get("wellKnownUrl", "unknown7"),\n    "ssiWalletApi": info.get("ssiWalletApi", "unknown7"),\n    "upstream_idp": source.name if source else "unknown7",\n    "external_subject": info.get("sub"),\n}'
         },
         "state": "present"
     })
@@ -1063,6 +1063,17 @@ def generate_blueprint(
     
     entries.append({
         "model": "authentik_providers_oauth2.scopemapping",
+        "identifiers": {"name": "oe-ssiWalletApi"},
+        "attrs": {
+            "scope_name": "oe-ssiWalletApi",
+            "description": "Used to claim ssi wallet api url",
+            "expression": 'return {\n    "ssiWalletApi": request.user.attributes.get("ssiWalletApi", "")\n}'
+        },
+        "state": "present"
+    })
+    
+    entries.append({
+        "model": "authentik_providers_oauth2.scopemapping",
         "identifiers": {"name": "oe-walletId"},
         "attrs": {
             "scope_name": "oe-walletId",
@@ -1092,7 +1103,7 @@ def generate_blueprint(
         "identifiers": {"name": "oe-save-user-attributes"},
         "attrs": {
             "execution_logging": True,
-            "expression": 'org = context.get("prompt_data", {}).get("orgId")\nwallet_id = context.get("prompt_data", {}).get("walletId")\nsigner_server = context.get("prompt_data", {}).get("signerServer")\nwell_known_url = context.get("prompt_data", {}).get("wellKnownUrl")\nupstream_idp = context.get("prompt_data", {}).get("upstream_idp")\n\nuser = context.get("pending_user")\n\nif user:\n    if org:\n        user.attributes["orgId"] = org\n    \n    if wallet_id:\n        user.attributes["walletId"] = wallet_id\n    \n    if signer_server:\n        user.attributes["signerServer"] = signer_server\n    \n    if well_known_url:\n        user.attributes["wellKnownUrl"] = well_known_url\n    \n    if upstream_idp:\n        user.attributes["upstream_idp"] = upstream_idp\n    \n    user.save()\n\nreturn True'
+            "expression": 'org = context.get("prompt_data", {}).get("orgId")\nwallet_id = context.get("prompt_data", {}).get("walletId")\nsigner_server = context.get("prompt_data", {}).get("signerServer")\nwell_known_url = context.get("prompt_data", {}).get("wellKnownUrl")\nssi_wallet_api = context.get("prompt_data", {}).get("ssiWalletApi")\nupstream_idp = context.get("prompt_data", {}).get("upstream_idp")\n\nuser = context.get("pending_user")\n\nif user:\n    if org:\n        user.attributes["orgId"] = org\n    \n    if wallet_id:\n        user.attributes["walletId"] = wallet_id\n    \n    if signer_server:\n        user.attributes["signerServer"] = signer_server\n    \n    if well_known_url:\n        user.attributes["wellKnownUrl"] = well_known_url\n    \n    if ssi_wallet_api:\n        user.attributes["ssiWalletApi"] = ssi_wallet_api\n    \n    if upstream_idp:\n        user.attributes["upstream_idp"] = upstream_idp\n    \n    user.save()\n\nreturn True'
         },
         "state": "present"
     })
@@ -1467,7 +1478,7 @@ def generate_blueprint(
     # ================================================================
     
     property_mappings = []
-    custom_scope_names = ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-walletId", "oe-central-federated_identity"]
+    custom_scope_names = ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-ssiWalletApi", "oe-walletId", "oe-central-federated_identity"]
     for scope_name in custom_scope_names:
         property_mappings.append(f"!FIND_MARKER:[authentik_providers_oauth2.scopemapping, [scope_name, {scope_name}]]")
     
@@ -1661,6 +1672,7 @@ def main():
     print("    - oe-organizationId (returns 'orgId')")
     print("    - oe-signerServer")
     print("    - oe-wellKnownUrl")
+    print("    - oe-ssiWalletApi")
     print("    - oe-walletId")
     print("    - oe-central-federated_identity (returns 'upstream_idp')")
     print("  oe-app-auth-flow")

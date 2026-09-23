@@ -270,7 +270,7 @@ def generate_blueprint(
         logout_uri = redirect_uris[-1] if redirect_uris else "https://your-app-url.com/auth/callback/logout"
     
     if custom_scopes is None:
-        custom_scopes = ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-walletId"]
+        custom_scopes = ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-ssiWalletApi", "oe-walletId"]
     
     admin_email = os.getenv("AUTHENTIK_EMAIL__FROM", "system@authentik.local")
     email_config = get_email_config()
@@ -843,6 +843,17 @@ def generate_blueprint(
     
     entries.append({
         "model": "authentik_providers_oauth2.scopemapping",
+        "identifiers": {"name": "oe-ssiWalletApi"},
+        "attrs": {
+            "scope_name": "oe-ssiWalletApi",
+            "description": "Used to claim ssi wallet api url",
+            "expression": 'return {\n    "ssiWalletApi": request.user.attributes.get("ssiWalletApi", "")\n}'
+        },
+        "state": "present"
+    })
+    
+    entries.append({
+        "model": "authentik_providers_oauth2.scopemapping",
         "identifiers": {"name": "oe-walletId"},
         "attrs": {
             "scope_name": "oe-walletId",
@@ -861,7 +872,7 @@ def generate_blueprint(
         "identifiers": {"name": "oe-save-user-attributes"},
         "attrs": {
             "execution_logging": True,
-            "expression": 'org = context.get("prompt_data", {}).get("orgId")\nwallet_id = context.get("prompt_data", {}).get("walletId")\nsigner_server = context.get("prompt_data", {}).get("signerServer")\nwell_known_url = context.get("prompt_data", {}).get("wellKnownUrl")\n\nuser = context.get("pending_user")\n\nif user:\n    if org:\n        user.attributes["orgId"] = org\n    \n    if wallet_id:\n        user.attributes["walletId"] = wallet_id\n    \n    if signer_server:\n        user.attributes["signerServer"] = signer_server\n    \n    if well_known_url:\n        user.attributes["wellKnownUrl"] = well_known_url\n    \n    user.save()\n\nreturn True'
+            "expression": 'org = context.get("prompt_data", {}).get("orgId")\nwallet_id = context.get("prompt_data", {}).get("walletId")\nsigner_server = context.get("prompt_data", {}).get("signerServer")\nwell_known_url = context.get("prompt_data", {}).get("wellKnownUrl")\nssi_wallet_api = context.get("prompt_data", {}).get("ssiWalletApi")\n\nuser = context.get("pending_user")\n\nif user:\n    if org:\n        user.attributes["orgId"] = org\n    \n    if wallet_id:\n        user.attributes["walletId"] = wallet_id\n    \n    if signer_server:\n        user.attributes["signerServer"] = signer_server\n    \n    if well_known_url:\n        user.attributes["wellKnownUrl"] = well_known_url\n    \n    if ssi_wallet_api:\n        user.attributes["ssiWalletApi"] = ssi_wallet_api\n    \n    user.save()\n\nreturn True'
         },
         "state": "present"
     })
@@ -1156,7 +1167,7 @@ def generate_blueprint(
     # ================================================================
     
     property_mappings = []
-    for scope_name in ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-walletId"]:
+    for scope_name in ["oe-organizationId", "oe-signerServer", "oe-wellKnownUrl", "oe-ssiWalletApi", "oe-walletId"]:
         property_mappings.append(f"!FIND_MARKER:[authentik_providers_oauth2.scopemapping, [scope_name, {scope_name}]]")
     
     default_scopes = ["openid", "email", "profile", "offline_access"]
